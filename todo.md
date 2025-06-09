@@ -2,7 +2,7 @@
 
 ## General
 - [x] Give name to project
-- [ ] Github(s?)
+- [x] Github(s?)
 - [ ] Versioning
 - [ ] Roadmap
 - [ ] Trello or simillar
