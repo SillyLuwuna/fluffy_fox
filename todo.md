@@ -3,8 +3,8 @@
 ## General
 - [x] Give name to project
 - [x] Github(s?)
-- [ ] Versioning
-- [ ] Roadmap
+- [x] Versioning
+- [x] Roadmap
 - [ ] Trello or simillar
 
 ## Graphics engine (Vulkan)
