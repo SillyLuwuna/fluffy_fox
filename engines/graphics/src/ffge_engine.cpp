@@ -15,6 +15,11 @@ namespace FluffyFox::Graphics
 
 	Engine::~Engine()
 	{
+		// !!! EXPLICIT DESTROY ORDER !!!
+		m_debugMessenger.reset();
+		m_instance.reset();
+		m_window.reset();
+		// !!! EXPLICIT DESTROY ORDER !!!
 	}
 
 	void Engine::run()
@@ -41,7 +46,7 @@ namespace FluffyFox::Graphics
 		{
 			throw std::runtime_error("validation layers requested, but not available!");
 		}
-		m_instance = std::make_unique<Instance>(APP_NAME, APP_VERSION, validationLayers);
+		m_instance = std::make_unique<Instance>(APP_NAME, APP_VERSION, validationLayers, *m_debugMessenger);
 	}
 
 	bool Engine::checkValidationLayerSupport()
@@ -83,6 +88,9 @@ namespace FluffyFox::Graphics
 
 	void Engine::setupDebugMessenger()
 	{
-		m_instance->setupDebugMessenger();
+		if (!FFGE_DEBUG) return;
+
+		m_debugMessenger = std::make_unique<DebugMessenger>(m_instance->getVkInstance());
+		// m_instance->setupDebugMessenger();
 	}
 }

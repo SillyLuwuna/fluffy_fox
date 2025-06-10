@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ffge_debugMessenger.hpp"
 #include "ffge_window.hpp"
 #include "ffge_instance.hpp"
 #include <memory>
@@ -30,8 +31,11 @@ namespace FluffyFox::Graphics
 				"VK_LAYER_KHRONOS_validation"
 			};
 
+			// ORDER MATTERS
 			std::unique_ptr<Window> m_window;
 			std::unique_ptr<Instance> m_instance;
+			std::unique_ptr<DebugMessenger> m_debugMessenger;
+			// ORDER MATTERS
 
 			void initWindow();
 			void initVulkan();

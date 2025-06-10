@@ -14,11 +14,11 @@ namespace FluffyFox::Graphics
 			DebugMessenger(const DebugMessenger &) = delete;
 			DebugMessenger &operator=(const DebugMessenger &) = delete;
 
-			void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo);
+			void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo) const;
 
 		private:
 			VkDebugUtilsMessengerEXT m_debugMessenger;
-			const VkInstance &m_instance; // since the instance is guaranteed to outlive the debug messenger
+			const VkInstance &m_instance; // since the instance is guaranteed to outlive the debug messenger by the engine
 
 			static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 				VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,

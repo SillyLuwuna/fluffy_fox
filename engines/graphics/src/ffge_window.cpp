@@ -1,4 +1,5 @@
 #include "ffge_window.hpp"
+#include <iostream>
 
 namespace FluffyFox::Graphics
 {
