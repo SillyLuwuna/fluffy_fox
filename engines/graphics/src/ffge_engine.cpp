@@ -1,7 +1,9 @@
 #include "ffge_engine.hpp"
+#include "ffge_config.hpp"
 
-#include <vector>
+#include <cstring>
 #include <iostream>
+#include <vector>
 #include <stdexcept>
 
 namespace FluffyFox::Graphics
@@ -30,11 +32,45 @@ namespace FluffyFox::Graphics
 	void Engine::initVulkan()
 	{
 		createInstance();
+		setupDebugMessenger();
 	}
 
 	void Engine::createInstance()
 	{
-		m_instance = std::make_unique<Instance>(APP_NAME, APP_VERSION);
+		if (FFGE_DEBUG && !checkValidationLayerSupport())
+		{
+			throw std::runtime_error("validation layers requested, but not available!");
+		}
+		m_instance = std::make_unique<Instance>(APP_NAME, APP_VERSION, validationLayers);
+	}
+
+	bool Engine::checkValidationLayerSupport()
+	{
+		uint32_t layerCount;
+		vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+		std::vector<VkLayerProperties> availableLayers(layerCount);
+		vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+		for (const char *layerName : validationLayers)
+		{
+			bool layerFound = false;
+			for (const auto &layerProperties : availableLayers)
+			{
+				if (strcmp(layerName, layerProperties.layerName) == 0)
+				{
+					layerFound = true;
+					break;
+				}
+			}
+
+			if (!layerFound)
+			{
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	void Engine::mainLoop()
@@ -43,5 +79,10 @@ namespace FluffyFox::Graphics
 		{
 			glfwPollEvents();
 		}
+	}
+
+	void Engine::setupDebugMessenger()
+	{
+		m_instance->setupDebugMessenger();
 	}
 }

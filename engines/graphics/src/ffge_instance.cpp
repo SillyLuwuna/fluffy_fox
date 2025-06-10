@@ -1,3 +1,4 @@
+#include "ffge_config.hpp"
 #include "ffge_instance.hpp"
 #include <iostream>
 #include <stdexcept>
@@ -5,10 +6,11 @@
 
 namespace FluffyFox::Graphics
 {
-	Instance::Instance(std::string appName, uint32_t version) :
+	Instance::Instance(const std::string appName, const uint32_t version, const std::vector<const char *> &validationLayers) :
 		m_appName{appName},
 		m_version{version}
 	{
+		// app info
 		VkApplicationInfo appInfo{};
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 		appInfo.pApplicationName = m_appName.c_str();
@@ -17,25 +19,39 @@ namespace FluffyFox::Graphics
 		appInfo.engineVersion = m_version;
 		appInfo.apiVersion = API_VERSION;
 
+		// instance create info
 		VkInstanceCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		createInfo.pApplicationInfo = &appInfo;
 
-		uint32_t glfwExtensionCount = 0;
-		const char** glfwExtensions;
+		std::vector<const char *> extensions = getRequiredExtensions();
+		createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+		createInfo.ppEnabledExtensionNames = extensions.data();
 
-		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+		if constexpr (FFGE_DEBUG)
+		{
+			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+			createInfo.ppEnabledLayerNames = validationLayers.data();
 
-		createInfo.enabledExtensionCount = glfwExtensionCount;
-		createInfo.ppEnabledExtensionNames = glfwExtensions;
-		createInfo.enabledLayerCount = 0;
+			m_debugMessenger->populateDebugMessengerCreateInfo(debugCreateInfo);
+			createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *) &debugCreateInfo;
+		}
+		else
+		{
+			createInfo.enabledLayerCount = 0;
 
+			createInfo.pNext = nullptr;
+		}
+
+		// instance creation
 		if (vkCreateInstance(&createInfo, nullptr, &m_instance) != VK_SUCCESS)
 		{
 			throw std::runtime_error("failed to create instance!");
 		}
 
-		if (DEBUG)
+		// debug
+		if constexpr (FFGE_DEBUG)
 		{
 			uint32_t extensionCount = 0;
 			vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
@@ -54,5 +70,28 @@ namespace FluffyFox::Graphics
 	Instance::~Instance()
 	{
 		vkDestroyInstance(m_instance, nullptr);
+	}
+
+	std::vector<const char *> Instance::getRequiredExtensions()
+	{
+		uint32_t glfwExtensionCount = 0;
+		const char** glfwExtensions;
+		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+		std::vector<const char *> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+
+		if (FFGE_DEBUG)
+		{
+			extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+		}
+
+		return extensions;
+	}
+
+	void Instance::setupDebugMessenger()
+	{
+		if (!FFGE_DEBUG) return;
+
+		m_debugMessenger = std::make_unique<DebugMessenger>(m_instance);
 	}
 }

@@ -4,11 +4,11 @@
 
 int main()
 {
-	FluffyFox::Graphics::Engine engine;
+	FluffyFox::Graphics::Engine ffGraphicEngine;
 
 	try
 	{
-		engine.run();
+		ffGraphicEngine.run();
 	}
 	catch (const std::exception &e)
 	{

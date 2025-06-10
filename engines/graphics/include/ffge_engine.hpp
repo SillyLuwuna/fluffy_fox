@@ -3,6 +3,7 @@
 #include "ffge_window.hpp"
 #include "ffge_instance.hpp"
 #include <memory>
+#include <vector>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -25,6 +26,9 @@ namespace FluffyFox::Graphics
 			const std::string TITLE = "Vulkan";
 			const std::string APP_NAME = "Fluffy Graphics Engine";
 			const uint32_t APP_VERSION = VK_MAKE_VERSION(0, 0, 0);
+			const std::vector<const char*> validationLayers = {
+				"VK_LAYER_KHRONOS_validation"
+			};
 
 			std::unique_ptr<Window> m_window;
 			std::unique_ptr<Instance> m_instance;
@@ -33,6 +37,7 @@ namespace FluffyFox::Graphics
 			void initVulkan();
 			void createInstance();
 			void mainLoop();
-			void cleanup();
+			bool checkValidationLayerSupport();
+			void setupDebugMessenger();
 	};
 }

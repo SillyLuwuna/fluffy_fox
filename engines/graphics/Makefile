@@ -1,5 +1,6 @@
 CPPC = g++
 CFLAGS = -std=c++17 -O2
+# CFLAGS = -std=c++17 -O2 -DNDEBUG
 LDFLAGS = -lglfw -lvulkan -ldl -lpthread -lX11 -lXxf86vm -lXrandr -lXi
 SRCFILES = $(wildcard src/*.cpp)
 

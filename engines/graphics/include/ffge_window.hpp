@@ -10,7 +10,7 @@ namespace FluffyFox::Graphics
 	class Window
 	{
 		public:
-			Window(int width, int height, std::string title);
+			Window(const int width, const int height, const std::string &title);
 			~Window();
 
 			Window(const Window &) = delete;
