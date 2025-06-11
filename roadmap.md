@@ -4,25 +4,25 @@
 - [x] Create project
 
 #### Milestone: v0.0.1
-- [ ] Setup vulkan
+- [x] Setup vulkan
 
 #### Milestone: v0.0.2
-- [ ] Create a vulkan instance
+- [x] Create a vulkan instance
 
 #### Milestone: v0.0.3
-- [ ] Create a window surface
-
-#### Milestone: v0.0.4
 - [ ] Physical device
 
-#### Milestone: v0.0.5
+#### Milestone: v0.0.4
 - [ ] Logical device
+
+#### Milestone: v0.0.5
+- [ ] Create a window surface
 
 #### Milestone: v0.0.6
 - [ ] Swapchain
 
 #### Milestone: v0.0.7
-- [ ] Image viewers
+- [ ] Image views
 
 #### Milestone: v0.0.8
 - [ ] Render pass

@@ -9,8 +9,7 @@ namespace FluffyFox::Graphics
 	Instance::Instance(
 			const std::string appName,
 			const uint32_t version,
-			const std::vector<const char *> &validationLayers,
-			const DebugMessenger &debugMessenger) :
+			const std::vector<const char *> &validationLayers) :
 		m_appName{appName},
 		m_version{version}
 	{
@@ -38,7 +37,7 @@ namespace FluffyFox::Graphics
 			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
 			createInfo.ppEnabledLayerNames = validationLayers.data();
 
-			debugMessenger.populateDebugMessengerCreateInfo(debugCreateInfo);
+			m_debugMessenger->populateDebugMessengerCreateInfo(debugCreateInfo);
 			createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *) &debugCreateInfo;
 		}
 		else
@@ -73,6 +72,7 @@ namespace FluffyFox::Graphics
 
 	Instance::~Instance()
 	{
+		m_debugMessenger.reset(); // MUST BE DESTROYED FIRST!
 		vkDestroyInstance(m_instance, nullptr);
 	}
 
@@ -91,9 +91,16 @@ namespace FluffyFox::Graphics
 
 		return extensions;
 	}
+	//
+	// VkInstance &Instance::getVkInstance()
+	// {
+	// 	return m_instance;
+	// }
 
-	VkInstance &Instance::getVkInstance()
+	void Instance::setupDebugMessenger()
 	{
-		return m_instance;
+		if (!FFGE_DEBUG) return;
+
+		m_debugMessenger = std::make_unique<DebugMessenger>(m_instance);
 	}
 }

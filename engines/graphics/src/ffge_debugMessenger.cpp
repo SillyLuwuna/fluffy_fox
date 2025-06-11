@@ -14,6 +14,7 @@ namespace FluffyFox::Graphics
 		}
 	}
 
+	// Must be deleted before vkInstance
 	DebugMessenger::~DebugMessenger()
 	{
 		destroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
