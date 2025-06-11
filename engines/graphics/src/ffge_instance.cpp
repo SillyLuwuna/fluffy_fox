@@ -91,11 +91,6 @@ namespace FluffyFox::Graphics
 
 		return extensions;
 	}
-	//
-	// VkInstance &Instance::getVkInstance()
-	// {
-	// 	return m_instance;
-	// }
 
 	void Instance::setupDebugMessenger()
 	{
