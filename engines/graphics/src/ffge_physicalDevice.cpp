@@ -26,6 +26,11 @@ namespace FluffyFox::Graphics
 
 	PhysicalDevice::~PhysicalDevice() { }
 
+	const VkPhysicalDevice &PhysicalDevice::getHandle() const
+	{
+		return m_physicalDevice;
+	}
+
 	QueueFamilyIndices PhysicalDevice::findQueueFamilies() const
 	{
 		QueueFamilyIndices indices;

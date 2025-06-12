@@ -33,6 +33,8 @@ namespace FluffyFox::Graphics
 			// PhysicalDevice(PhysicalDevice &&) = default;
 			// PhysicalDevice &operator=(PhysicalDevice&&) = default;
 
+			const VkPhysicalDevice &getHandle() const;
+
 			QueueFamilyIndices findQueueFamilies() const;
 
 			inline bool isNull() const

@@ -13,8 +13,7 @@ namespace FluffyFox::Graphics
 	class Instance
 	{
 		public:
-			Instance(
-					const std::string appName,
+			Instance(const std::string appName,
 					const uint32_t version,
 					const std::vector<const char*> &validationLayers);
 			~Instance();

@@ -13,7 +13,7 @@
 - [x] Physical device
 
 #### Milestone: v0.0.4
-- [ ] Logical device
+- [x] Logical device
 
 #### Milestone: v0.0.5
 - [ ] Create a window surface

@@ -1,5 +1,6 @@
 #include "ffge_engine.hpp"
 #include "ffge_config.hpp"
+#include "ffge_device.hpp"
 
 #include <cstring>
 #include <iostream>
@@ -15,6 +16,7 @@ namespace FluffyFox::Graphics
 
 	Engine::~Engine()
 	{
+		m_device.reset();
 		m_instance.reset();
 		m_window.reset();
 	}
@@ -36,6 +38,7 @@ namespace FluffyFox::Graphics
 		createInstance();
 		setupDebugMessenger();
 		pickPhysicalDevice();
+		createLogicalDevice();
 	}
 
 	void Engine::createInstance()
@@ -122,5 +125,10 @@ namespace FluffyFox::Graphics
 		return indices.isComplete();
 		// return true;
 		// return device.isDedicatedGPU() && device.supportsGeometryShaders(); // INFO must be changed to accomodate for laptops.
+	}
+
+	void Engine::createLogicalDevice()
+	{
+		m_device = std::make_unique<Device>(m_physicalDevice);
 	}
 }

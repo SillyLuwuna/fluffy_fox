@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ffge_debugMessenger.hpp"
+#include "ffge_device.hpp"
 #include "ffge_window.hpp"
 #include "ffge_instance.hpp"
 #include <memory>
@@ -33,7 +33,8 @@ namespace FluffyFox::Graphics
 
 			std::unique_ptr<Window> m_window;
 			std::unique_ptr<Instance> m_instance;
-			PhysicalDevice m_physicalDevice;
+			PhysicalDevice m_physicalDevice; // only represents the hardware
+			std::unique_ptr<Device> m_device;
 			// std::unique_ptr<DebugMessenger> m_debugMessenger;
 
 			void initWindow();
@@ -44,5 +45,6 @@ namespace FluffyFox::Graphics
 			void setupDebugMessenger();
 			void pickPhysicalDevice();
 			bool isDeviceSuitable(const PhysicalDevice &device);
+			void createLogicalDevice();
 	};
 }
