@@ -33,6 +33,7 @@ namespace FluffyFox::Graphics
 
 			std::unique_ptr<Window> m_window;
 			std::unique_ptr<Instance> m_instance;
+			PhysicalDevice m_physicalDevice;
 			// std::unique_ptr<DebugMessenger> m_debugMessenger;
 
 			void initWindow();
@@ -41,5 +42,7 @@ namespace FluffyFox::Graphics
 			void mainLoop();
 			bool checkValidationLayerSupport();
 			void setupDebugMessenger();
+			void pickPhysicalDevice();
+			bool isDeviceSuitable(const PhysicalDevice &device);
 	};
 }

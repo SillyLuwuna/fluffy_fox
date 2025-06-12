@@ -98,4 +98,28 @@ namespace FluffyFox::Graphics
 
 		m_debugMessenger = std::make_unique<DebugMessenger>(m_instance);
 	}
+
+	std::vector<PhysicalDevice> Instance::getPhysicalDevices()
+	{
+		uint32_t deviceCount = 0;
+		vkEnumeratePhysicalDevices(m_instance, &deviceCount, nullptr);
+
+		if (deviceCount == 0)
+		{
+			throw std::runtime_error("failed to find GPUs with Vulkan support!");
+		}
+
+		std::cout << deviceCount << '\n';
+		std::vector<VkPhysicalDevice> vkDevices(deviceCount);
+		std::vector<PhysicalDevice> devices;
+		devices.reserve(deviceCount);
+		vkEnumeratePhysicalDevices(m_instance, &deviceCount, vkDevices.data());
+
+
+		for (const VkPhysicalDevice &vkDevice : vkDevices)
+		{
+			devices.emplace_back(PhysicalDevice(vkDevice));
+		}
+		return devices;
+	}
 }

@@ -8,18 +8,15 @@
 
 namespace FluffyFox::Graphics
 {
-	Engine::Engine()
+	Engine::Engine() : m_physicalDevice()
 	{
 
 	}
 
 	Engine::~Engine()
 	{
-		// !!! EXPLICIT DESTROY ORDER !!!
-		// m_debugMessenger.reset();
 		m_instance.reset();
 		m_window.reset();
-		// !!! EXPLICIT DESTROY ORDER !!!
 	}
 
 	void Engine::run()
@@ -38,6 +35,7 @@ namespace FluffyFox::Graphics
 	{
 		createInstance();
 		setupDebugMessenger();
+		pickPhysicalDevice();
 	}
 
 	void Engine::createInstance()
@@ -89,5 +87,40 @@ namespace FluffyFox::Graphics
 	void Engine::setupDebugMessenger()
 	{
 		m_instance->setupDebugMessenger();
+	}
+
+	void Engine::pickPhysicalDevice()
+	{
+		std::vector<PhysicalDevice> devices = m_instance->getPhysicalDevices();
+
+		#ifndef NDEBUG
+			std::cout << "Physical devices:\n";
+			for (const auto &device : devices)
+			{
+				std::cout << device.id() << ":\t" << device.name() << "\n";
+			}
+		#endif
+
+		for (const PhysicalDevice& device : devices)
+		{
+			if (isDeviceSuitable(device))
+			{
+				m_physicalDevice = device;
+				break;
+			}
+		}
+
+		if (m_physicalDevice.isNull())
+		{
+			throw std::runtime_error("failed to find a suitable GPU!");
+		}
+	}
+
+	bool Engine::isDeviceSuitable(const PhysicalDevice &device)
+	{
+		QueueFamilyIndices indices = device.findQueueFamilies();
+		return indices.isComplete();
+		// return true;
+		// return device.isDedicatedGPU() && device.supportsGeometryShaders(); // INFO must be changed to accomodate for laptops.
 	}
 }
