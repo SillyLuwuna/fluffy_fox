@@ -10,7 +10,7 @@
 - [x] Create a vulkan instance
 
 #### Milestone: v0.0.3
-- [ ] Physical device
+- [x] Physical device
 
 #### Milestone: v0.0.4
 - [ ] Logical device
