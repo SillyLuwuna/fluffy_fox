@@ -16,7 +16,7 @@
 - [x] Logical device
 
 #### Milestone: v0.0.5
-- [ ] Create a window surface
+- [x] Create a window surface
 
 #### Milestone: v0.0.6
 - [ ] Swapchain
@@ -33,29 +33,29 @@
 #### Milestone: v0.0.10
 - [ ] Framebuffers
 
-#### Milestone: v0.0.11
+#### Milestone: v0.0.11 <---- TRIANGLE
 - [ ] Command pool
 - [ ] Command buffer
 
-#### Milestone: v0.0.12
+#### Milestone: v0.0.12 <---- CUSTOM GEOMETRY
 - [ ] Load obj file
 
 #### Milestone: v0.0.13
 - [ ] Manage GPU memory
 
-#### Milestone: v0.0.14
+#### Milestone: v0.0.14 <---- TEXTURES
 - [ ] Load textures
 
 #### Milestone: v0.0.15
 - [ ] Uniform buffers
 
-#### Milestone: v0.0.16
+#### Milestone: v0.0.16 <---- SHADOWS
 - [ ] Shadow mapping
 
 #### Milestone: v0.0.17
 - [ ] Load skeletal data
 
-#### Milestone: v0.0.18
+#### Milestone: v0.0.18 <---- ANIMATIONS
 - [ ] GPU skinning
 
 ### Milestone: v0.1.0

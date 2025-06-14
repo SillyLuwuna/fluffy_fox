@@ -1,3 +1,4 @@
+#include "ffge_surface.hpp"
 #include <iostream>
 #include <vector>
 #define GLFW_INCLUDE_VULKAN
@@ -26,33 +27,35 @@ namespace FluffyFox::Graphics
 
 	PhysicalDevice::~PhysicalDevice() { }
 
-	const VkPhysicalDevice &PhysicalDevice::getHandle() const
+	QueueFamilyIndices PhysicalDevice::findQueueFamilies(const Surface &surface) const
 	{
-		return m_physicalDevice;
-	}
-
-	QueueFamilyIndices PhysicalDevice::findQueueFamilies() const
-	{
-		QueueFamilyIndices indices;
-
 		std::vector<VkQueueFamilyProperties> queueFamilies = getQueueFamilyProperties();
 
 		int i = 0;
+		QueueFamilyIndices indices;
 		for (const VkQueueFamilyProperties queueFamily : queueFamilies)
 		{
-			if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
-			{
-				indices.graphicsFamily = i;
-			}
+			if (hasGraphicsQueue(queueFamily)) { indices.graphicsFamily = i; }
 
-			if (indices.isComplete())
-			{
-				break;
-			}
+			if (hasPresentQueue(i, surface)) { indices.presentFamily = i; }
+
+			if (indices.isComplete()) { break; }
 			i++;
 		}
 
 		return indices;
+	}
+
+	bool PhysicalDevice::hasPresentQueue(int index, const Surface &surface) const
+	{
+		VkBool32 presentSupport = false;
+		vkGetPhysicalDeviceSurfaceSupportKHR(m_physicalDevice, index, surface.getHandle(), &presentSupport);
+		return presentSupport;
+	}
+
+	bool PhysicalDevice::hasGraphicsQueue(const VkQueueFamilyProperties &queueFamily) const
+	{
+		return queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT;
 	}
 
 	std::vector<VkQueueFamilyProperties> PhysicalDevice::getQueueFamilyProperties() const

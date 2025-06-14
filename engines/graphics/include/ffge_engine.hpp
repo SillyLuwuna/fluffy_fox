@@ -1,15 +1,19 @@
 #pragma once
 
-#include "ffge_device.hpp"
-#include "ffge_window.hpp"
-#include "ffge_instance.hpp"
+#include "ffge_physicalDevice.hpp"
 #include <memory>
 #include <vector>
+#include <string>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 namespace FluffyFox::Graphics
 {
+	class Device;
+	class Surface;
+	class Window;
+	class Instance;
+
 	class Engine
 	{
 		public:
@@ -35,7 +39,7 @@ namespace FluffyFox::Graphics
 			std::unique_ptr<Instance> m_instance;
 			PhysicalDevice m_physicalDevice; // only represents the hardware
 			std::unique_ptr<Device> m_device;
-			// std::unique_ptr<DebugMessenger> m_debugMessenger;
+			std::unique_ptr<Surface> m_surface;
 
 			void initWindow();
 			void initVulkan();
@@ -46,5 +50,6 @@ namespace FluffyFox::Graphics
 			void pickPhysicalDevice();
 			bool isDeviceSuitable(const PhysicalDevice &device);
 			void createLogicalDevice();
+			void createSurface();
 	};
 }

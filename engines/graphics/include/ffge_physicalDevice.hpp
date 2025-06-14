@@ -8,13 +8,16 @@
 
 namespace FluffyFox::Graphics
 {
+	class Surface;
+
 	struct QueueFamilyIndices
 	{
 		std::optional<uint32_t> graphicsFamily;
+		std::optional<uint32_t> presentFamily;
 
 		bool isComplete()
 		{
-			return graphicsFamily.has_value();
+			return graphicsFamily.has_value() && presentFamily.has_value();
 		}
 	};
 
@@ -33,9 +36,12 @@ namespace FluffyFox::Graphics
 			// PhysicalDevice(PhysicalDevice &&) = default;
 			// PhysicalDevice &operator=(PhysicalDevice&&) = default;
 
-			const VkPhysicalDevice &getHandle() const;
+			inline const VkPhysicalDevice &getHandle() const
+			{
+				return m_physicalDevice;
+			}
 
-			QueueFamilyIndices findQueueFamilies() const;
+			QueueFamilyIndices findQueueFamilies(const Surface &surface) const;
 
 			inline bool isNull() const
 			{
@@ -71,5 +77,7 @@ namespace FluffyFox::Graphics
 			std::vector<VkQueueFamilyProperties> getQueueFamilyProperties() const;
 
 			void cacheValues();
+			bool hasPresentQueue(int index, const Surface &surface) const;
+			bool hasGraphicsQueue(const VkQueueFamilyProperties &queueFamily) const;
 	};
 }

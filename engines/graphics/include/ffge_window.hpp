@@ -1,12 +1,15 @@
 #pragma once
 
+#include <memory>
+#include <string>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include <string>
-
 namespace FluffyFox::Graphics
 {
+	class Surface;
+	class Instance;
+
 	class Window
 	{
 		public:
@@ -17,6 +20,13 @@ namespace FluffyFox::Graphics
 			Window &operator=(const Window &) = delete;
 
 			bool shouldClose();
+
+			inline GLFWwindow *getHandle() const
+			{
+				return m_window;
+			}
+
+			std::unique_ptr<Surface> createSurface(Instance &instance);
 
 		private:
 			const int m_width;

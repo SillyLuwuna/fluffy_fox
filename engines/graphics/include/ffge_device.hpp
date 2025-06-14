@@ -1,26 +1,36 @@
 #pragma once
 
-#include "ffge_physicalDevice.hpp"
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 namespace FluffyFox::Graphics
 {
+	class PhysicalDevice;
+	class Surface;
+	struct QueueFamilyIndices;
+
 	class Device
 	{
 		public:
-			Device(PhysicalDevice &pd);
+			Device(const PhysicalDevice &physicalDevice, const Surface &surface);
 			~Device();
 
 			Device(const Device &) = delete;
 			Device &operator=(const Device &) = delete;
 
+			inline const VkDevice &getHandle() const
+			{
+				return m_device;
+			}
+
 		private:
 			VkDevice m_device;
-			PhysicalDevice &m_physicalDevice;
+			const PhysicalDevice &m_physicalDevice;
 			VkQueue m_graphicsQueue;
+			VkQueue m_presentQueue;
 
-			void initLogicDevice(QueueFamilyIndices &indices);
-			void initGraphicsQueue(QueueFamilyIndices &indices);
+			void initLogicDevice(const QueueFamilyIndices &indices);
+			void initGraphicsQueue(const QueueFamilyIndices &indices);
+			void initPresentQueue(const QueueFamilyIndices &indices);
 	};
 }

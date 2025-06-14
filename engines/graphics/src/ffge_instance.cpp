@@ -1,4 +1,6 @@
 #include "ffge_config.hpp"
+#include "ffge_debugMessenger.hpp"
+#include "ffge_physicalDevice.hpp"
 #include "ffge_instance.hpp"
 #include <iostream>
 #include <stdexcept>
@@ -80,7 +82,7 @@ namespace FluffyFox::Graphics
 	{
 		uint32_t glfwExtensionCount = 0;
 		const char** glfwExtensions;
-		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount); // includes VK_KHR_win32_surface
 
 		std::vector<const char *> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 

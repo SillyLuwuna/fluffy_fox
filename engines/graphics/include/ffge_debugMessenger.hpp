@@ -16,6 +16,11 @@ namespace FluffyFox::Graphics
 
 			void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo) const;
 
+			inline const VkDebugUtilsMessengerEXT &getHandle() const
+			{
+				return m_debugMessenger;
+			}
+
 		private:
 			VkDebugUtilsMessengerEXT m_debugMessenger;
 			const VkInstance &m_instance; // since the instance is guaranteed to outlive the debug messenger by the engine

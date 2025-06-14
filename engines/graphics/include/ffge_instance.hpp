@@ -1,7 +1,5 @@
 #pragma once
 
-#include "ffge_debugMessenger.hpp"
-#include "ffge_physicalDevice.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -10,6 +8,9 @@
 
 namespace FluffyFox::Graphics
 {
+	class PhysicalDevice;
+	class DebugMessenger;
+
 	class Instance
 	{
 		public:
@@ -23,6 +24,11 @@ namespace FluffyFox::Graphics
 
 			void setupDebugMessenger();
 			std::vector<PhysicalDevice> getPhysicalDevices();
+
+			inline const VkInstance &getHandle() const
+			{
+				return m_instance;
+			}
 
 		private:
 			const uint32_t API_VERSION = VK_API_VERSION_1_4; // INFO might want to use version 1_0
