@@ -86,9 +86,7 @@ namespace FluffyFox::Graphics
 		SwapchainSupportDetails details;
 
 		// get surface capabilities for this physical device - surface pair
-		std::cout << "surface: " << surface.getHandle() << std::endl;
 		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, surface.getHandle(), &details.capabilities);
-		std::cout << "here from querySwapchainSupport()" << std::endl;
 
 		// get supported surface formats for this physical device - surface pair
 		uint32_t formatCount;

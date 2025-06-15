@@ -33,6 +33,11 @@ namespace FluffyFox::Graphics
 		createInfo.ppEnabledExtensionNames = extensions.data();
 
 		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+		#ifndef NDEBUG
+			// std::cout << "glfw required extensions:" << std::endl;
+			// for (const auto &extension : extensions)
+			// 	std::cout << "\t" << extension << "\n";
+		#endif
 
 		#ifndef NDEBUG
 			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
@@ -54,17 +59,17 @@ namespace FluffyFox::Graphics
 
 		// debug
 		#ifndef NDEBUG
-			uint32_t extensionCount = 0;
-			vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-
-			std::vector<VkExtensionProperties> extensionsAvailable(extensionCount);
-			vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensionsAvailable.data());
-
-			std::cout << "instance available extensions:\n";
-			for (const auto& extension : extensionsAvailable)
-			{
-				std::cout << '\t' << extension.extensionName << '\n';
-			}
+			// uint32_t extensionCount = 0;
+			// vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+			//
+			// std::vector<VkExtensionProperties> enabledExtensions(extensionCount);
+			// vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, enabledExtensions.data());
+			//
+			// std::cout << "instance enabled extensions:\n";
+			// for (const auto& extension : enabledExtensions)
+			// {
+			// 	std::cout << '\t' << extension.extensionName << '\n';
+			// }
 		#endif
 	}
 
@@ -108,7 +113,6 @@ namespace FluffyFox::Graphics
 			throw std::runtime_error("failed to find GPUs with Vulkan support!");
 		}
 
-		std::cout << deviceCount << '\n';
 		std::vector<VkPhysicalDevice> vkDevices(deviceCount);
 		std::vector<PhysicalDevice> devices;
 		devices.reserve(deviceCount);

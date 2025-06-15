@@ -46,7 +46,6 @@ namespace FluffyFox::Graphics
 		createInstance();
 		setupDebugMessenger();
 		createSurface();
-		std::cout << "(engine) surface: " << m_surface->getHandle() << std::endl;
 		pickPhysicalDevice();
 		createLogicalDevice();
 		createSwapchain();
@@ -145,7 +144,7 @@ namespace FluffyFox::Graphics
 		bool swapchainAdequate = false;
 		if (extensionsSupported)
 		{
-			SwapchainSupportDetails swapchainSupport = m_physicalDevice.querySwapchainSupport(*m_surface);
+			SwapchainSupportDetails swapchainSupport = device.querySwapchainSupport(*m_surface);
 			swapchainAdequate = !swapchainSupport.formats.empty() && !swapchainSupport.presentModes.empty();
 		}
 
@@ -157,20 +156,20 @@ namespace FluffyFox::Graphics
 	{
 		std::vector<VkExtensionProperties> availableExtensions = device.getAvailableExtensions();
 		#ifndef NDEBUG
-			std::cout << "device available extensions:\n";
-			for (const auto &availableExtension : availableExtensions)
-			{
-				std::cout << "\t" << availableExtension.extensionName << "\n";
-			}
+			// std::cout << "device available extensions:\n";
+			// for (const auto &availableExtension : availableExtensions)
+			// {
+			// 	std::cout << "\t" << availableExtension.extensionName << "\n";
+			// }
 		#endif
 
 		std::set<std::string> requiredExtensions(m_deviceExtensions.begin(), m_deviceExtensions.end());
 		#ifndef NDEBUG
-			std::cout << "required extensions:\n";
-			for (const auto &requiredExtension : requiredExtensions)
-			{
-				std::cout << "\t" << requiredExtension << "\n";
-			}
+			// std::cout << "required extensions:\n";
+			// for (const auto &requiredExtension : requiredExtensions)
+			// {
+			// 	std::cout << "\t" << requiredExtension << "\n";
+			// }
 		#endif
 		for (const auto& extension : availableExtensions)
 		{
