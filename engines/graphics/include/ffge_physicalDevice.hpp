@@ -43,6 +43,8 @@ namespace FluffyFox::Graphics
 
 			QueueFamilyIndices findQueueFamilies(const Surface &surface) const;
 
+			std::vector<VkExtensionProperties> getAvailableExtensions() const;
+
 			inline bool isNull() const
 			{
 				return m_physicalDevice == VK_NULL_HANDLE;

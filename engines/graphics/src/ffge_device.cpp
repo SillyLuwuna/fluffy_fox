@@ -6,15 +6,15 @@
 
 namespace FluffyFox::Graphics
 {
-	Device::Device(const PhysicalDevice &physicalDevice, const Surface &surface) : m_physicalDevice(physicalDevice)
+	Device::Device(const PhysicalDevice &physicalDevice, const Surface &surface, const std::vector<const char *> &deviceExtensions) : m_physicalDevice(physicalDevice)
 	{
 		QueueFamilyIndices indices = m_physicalDevice.findQueueFamilies(surface);
-		initLogicDevice(indices);
+		initLogicDevice(indices, deviceExtensions);
 		initGraphicsQueue(indices);
 		initPresentQueue(indices);
 	}
 
-	void Device::initLogicDevice(const QueueFamilyIndices &indices)
+	void Device::initLogicDevice(const QueueFamilyIndices &indices, const std::vector<const char *> &deviceExtensions)
 	{
 		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 		std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()}; // ensures there are no duplicates if they are the same queue (extremely likely)
@@ -39,7 +39,8 @@ namespace FluffyFox::Graphics
 
 		createInfo.pEnabledFeatures = &deviceFeatures;
 
-		createInfo.enabledExtensionCount = 0;
+		createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+		createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
 		if (vkCreateDevice(m_physicalDevice.getHandle(), &createInfo, nullptr, &m_device) != VK_SUCCESS)
 		{

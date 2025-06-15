@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -12,7 +13,7 @@ namespace FluffyFox::Graphics
 	class Device
 	{
 		public:
-			Device(const PhysicalDevice &physicalDevice, const Surface &surface);
+			Device(const PhysicalDevice &physicalDevice, const Surface &surface, const std::vector<const char *> &deviceExtensions);
 			~Device();
 
 			Device(const Device &) = delete;
@@ -29,7 +30,7 @@ namespace FluffyFox::Graphics
 			VkQueue m_graphicsQueue;
 			VkQueue m_presentQueue;
 
-			void initLogicDevice(const QueueFamilyIndices &indices);
+			void initLogicDevice(const QueueFamilyIndices &indices, const std::vector<const char *> &deviceExtensions);
 			void initGraphicsQueue(const QueueFamilyIndices &indices);
 			void initPresentQueue(const QueueFamilyIndices &indices);
 	};

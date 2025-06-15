@@ -7,6 +7,7 @@
 
 #include <cstring>
 #include <iostream>
+#include <set>
 #include <vector>
 #include <stdexcept>
 
@@ -127,14 +128,29 @@ namespace FluffyFox::Graphics
 	bool Engine::isDeviceSuitable(const PhysicalDevice &device)
 	{
 		QueueFamilyIndices indices = device.findQueueFamilies(*m_surface);
-		return indices.isComplete();
-		// return true;
+
+		bool extensionsSupported = checkDeviceExtensionSupport(device);
+
+		return indices.isComplete() && extensionsSupported;
 		// return device.isDedicatedGPU() && device.supportsGeometryShaders(); // INFO must be changed to accomodate for laptops.
+	}
+
+	bool Engine::checkDeviceExtensionSupport(const PhysicalDevice &device)
+	{
+		std::vector<VkExtensionProperties> availableExtensions = device.getAvailableExtensions();
+
+		std::set<std::string> requiredExtensions(m_deviceExtensions.begin(), m_deviceExtensions.end());
+		for (const auto& extension : availableExtensions)
+		{
+			requiredExtensions.erase(extension.extensionName);
+		}
+
+		return requiredExtensions.empty();
 	}
 
 	void Engine::createLogicalDevice()
 	{
-		m_device = std::make_unique<Device>(m_physicalDevice, *m_surface);
+		m_device = std::make_unique<Device>(m_physicalDevice, *m_surface, m_deviceExtensions);
 	}
 
 	void Engine::createSurface()

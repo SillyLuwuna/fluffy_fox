@@ -34,6 +34,9 @@ namespace FluffyFox::Graphics
 			const std::vector<const char*> validationLayers = {
 				"VK_LAYER_KHRONOS_validation"
 			};
+			const std::vector<const char*> m_deviceExtensions = {
+				VK_KHR_SWAPCHAIN_EXTENSION_NAME
+			}; // required extensions for the host gpu
 
 			std::unique_ptr<Window> m_window;
 			std::unique_ptr<Instance> m_instance;
@@ -49,6 +52,7 @@ namespace FluffyFox::Graphics
 			void setupDebugMessenger();
 			void pickPhysicalDevice();
 			bool isDeviceSuitable(const PhysicalDevice &device);
+			bool checkDeviceExtensionSupport(const PhysicalDevice &device);
 			void createLogicalDevice();
 			void createSurface();
 	};

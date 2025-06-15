@@ -67,4 +67,15 @@ namespace FluffyFox::Graphics
 		vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &queueFamilyCount, queueFamilies.data());
 		return queueFamilies;
 	}
+
+	std::vector<VkExtensionProperties> PhysicalDevice::getAvailableExtensions() const
+	{
+		uint32_t extensionCount;
+		vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &extensionCount, nullptr);
+
+		std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+		vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &extensionCount, availableExtensions.data());
+
+		return availableExtensions;
+	}
 }
