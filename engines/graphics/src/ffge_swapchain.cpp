@@ -59,10 +59,17 @@ namespace FluffyFox::Graphics
 		createInfo.clipped = VK_TRUE;
 		createInfo.oldSwapchain = VK_NULL_HANDLE;
 
-		if (vkCreateSwapchainKHR(m_device.getHandle(), &createInfo, nullptr, &m_swapchain) != VK_SUCCESS)
+		if (vkCreateSwapchainKHR(device.getHandle(), &createInfo, nullptr, &m_swapchain) != VK_SUCCESS)
 		{
 			throw std::runtime_error("failed to create swapchain!");
 		}
+
+		vkGetSwapchainImagesKHR(device.getHandle(), m_swapchain, &imageCount, nullptr);
+		m_images.resize(imageCount);
+		vkGetSwapchainImagesKHR(device.getHandle(), m_swapchain, &imageCount, m_images.data());
+
+		m_imageFormat = surfaceFormat.format;
+		m_extent = extent;
 	}
 
 	Swapchain::~Swapchain()

@@ -19,7 +19,7 @@
 - [x] Create a window surface
 
 #### Milestone: v0.0.6
-- [ ] Swapchain
+- [x] Swapchain
 
 #### Milestone: v0.0.7
 - [ ] Image views

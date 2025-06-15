@@ -26,5 +26,8 @@ namespace FluffyFox::Graphics
 			VkExtent2D chooseSwapchainExtent(const VkSurfaceCapabilitiesKHR &capabilities, const Window &window);
 			VkSwapchainKHR m_swapchain;
 			const Device &m_device;
+			std::vector<VkImage> m_images;
+			VkFormat m_imageFormat;
+			VkExtent2D m_extent;
 	};
 }
