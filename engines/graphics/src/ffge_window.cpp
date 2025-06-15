@@ -24,6 +24,7 @@ namespace FluffyFox::Graphics
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 		m_window = glfwCreateWindow(m_width, m_height, m_title.c_str(), nullptr, nullptr); //INFO 4th parameter is for choosing which monitor to open the window on
+		std::cout << "window created: " << m_window << std::endl;
 	}
 
 	bool Window::shouldClose()

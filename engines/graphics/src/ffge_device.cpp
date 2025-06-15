@@ -1,6 +1,7 @@
 #include "ffge_surface.hpp"
 #include "ffge_device.hpp"
 #include "ffge_physicalDevice.hpp"
+#include "ffge_queueFamilyIndices.hpp"
 #include <stdexcept>
 #include <set>
 

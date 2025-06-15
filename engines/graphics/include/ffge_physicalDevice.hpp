@@ -1,6 +1,5 @@
 #pragma once
 
-#include <optional>
 #include <string>
 #include <vector>
 #define GLFW_INCLUDE_VULKAN
@@ -9,17 +8,8 @@
 namespace FluffyFox::Graphics
 {
 	class Surface;
-
-	struct QueueFamilyIndices
-	{
-		std::optional<uint32_t> graphicsFamily;
-		std::optional<uint32_t> presentFamily;
-
-		bool isComplete()
-		{
-			return graphicsFamily.has_value() && presentFamily.has_value();
-		}
-	};
+	struct QueueFamilyIndices;
+	struct SwapchainSupportDetails;
 
 	// Must not hold any "real" data; Efficient copy/move
 	class PhysicalDevice
@@ -44,6 +34,8 @@ namespace FluffyFox::Graphics
 			QueueFamilyIndices findQueueFamilies(const Surface &surface) const;
 
 			std::vector<VkExtensionProperties> getAvailableExtensions() const;
+
+			SwapchainSupportDetails querySwapchainSupport(const Surface &surface) const;
 
 			inline bool isNull() const
 			{

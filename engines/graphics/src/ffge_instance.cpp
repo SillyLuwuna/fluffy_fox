@@ -1,4 +1,3 @@
-#include "ffge_config.hpp"
 #include "ffge_debugMessenger.hpp"
 #include "ffge_physicalDevice.hpp"
 #include "ffge_instance.hpp"
@@ -34,20 +33,18 @@ namespace FluffyFox::Graphics
 		createInfo.ppEnabledExtensionNames = extensions.data();
 
 		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-		if constexpr (FFGE_DEBUG)
-		{
+
+		#ifndef NDEBUG
 			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
 			createInfo.ppEnabledLayerNames = validationLayers.data();
 
 			m_debugMessenger->populateDebugMessengerCreateInfo(debugCreateInfo);
 			createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *) &debugCreateInfo;
-		}
-		else
-		{
+		#else
 			createInfo.enabledLayerCount = 0;
 
 			createInfo.pNext = nullptr;
-		}
+		#endif
 
 		// instance creation
 		if (vkCreateInstance(&createInfo, nullptr, &m_instance) != VK_SUCCESS)
@@ -56,20 +53,19 @@ namespace FluffyFox::Graphics
 		}
 
 		// debug
-		if constexpr (FFGE_DEBUG)
-		{
+		#ifndef NDEBUG
 			uint32_t extensionCount = 0;
 			vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
 
-			std::vector<VkExtensionProperties> extensions(extensionCount);
-			vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+			std::vector<VkExtensionProperties> extensionsAvailable(extensionCount);
+			vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensionsAvailable.data());
 
-			std::cout << "avaliable extensions:\n";
-			for (const auto& extension : extensions)
+			std::cout << "instance available extensions:\n";
+			for (const auto& extension : extensionsAvailable)
 			{
 				std::cout << '\t' << extension.extensionName << '\n';
 			}
-		}
+		#endif
 	}
 
 	Instance::~Instance()
@@ -86,17 +82,18 @@ namespace FluffyFox::Graphics
 
 		std::vector<const char *> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
-		if (FFGE_DEBUG)
-		{
+		#ifndef NDEBUG
 			extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-		}
+		#endif
 
 		return extensions;
 	}
 
 	void Instance::setupDebugMessenger()
 	{
-		if (!FFGE_DEBUG) return;
+		#ifdef NDEBUG
+			return;
+		#endif
 
 		m_debugMessenger = std::make_unique<DebugMessenger>(m_instance);
 	}

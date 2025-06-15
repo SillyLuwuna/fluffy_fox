@@ -1,4 +1,6 @@
 #include "ffge_surface.hpp"
+#include "ffge_queueFamilyIndices.hpp"
+#include "ffge_swapchainSupportDetails.hpp"
 #include <iostream>
 #include <vector>
 #define GLFW_INCLUDE_VULKAN
@@ -77,5 +79,37 @@ namespace FluffyFox::Graphics
 		vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &extensionCount, availableExtensions.data());
 
 		return availableExtensions;
+	}
+
+	SwapchainSupportDetails PhysicalDevice::querySwapchainSupport(const Surface &surface) const
+	{
+		SwapchainSupportDetails details;
+
+		// get surface capabilities for this physical device - surface pair
+		std::cout << "surface: " << surface.getHandle() << std::endl;
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, surface.getHandle(), &details.capabilities);
+		std::cout << "here from querySwapchainSupport()" << std::endl;
+
+		// get supported surface formats for this physical device - surface pair
+		uint32_t formatCount;
+		vkGetPhysicalDeviceSurfaceFormatsKHR(m_physicalDevice, surface.getHandle(), &formatCount, nullptr);
+
+		if (formatCount != 0)
+		{
+			details.formats.resize(formatCount);
+			vkGetPhysicalDeviceSurfaceFormatsKHR(m_physicalDevice, surface.getHandle(), &formatCount, details.formats.data());
+		}
+
+		// get supported presentation modes for this physical device - surface pair
+		uint32_t presentModeCount;
+		vkGetPhysicalDeviceSurfacePresentModesKHR(m_physicalDevice, surface.getHandle(), &presentModeCount, nullptr);
+
+		if (presentModeCount != 0)
+		{
+			details.presentModes.resize(presentModeCount);
+			vkGetPhysicalDeviceSurfacePresentModesKHR(m_physicalDevice, surface.getHandle(), &presentModeCount, details.presentModes.data());
+		}
+
+		return details;
 	}
 }

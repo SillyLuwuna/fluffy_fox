@@ -13,6 +13,7 @@ namespace FluffyFox::Graphics
 	class Surface;
 	class Window;
 	class Instance;
+	class Swapchain;
 
 	class Engine
 	{
@@ -43,6 +44,7 @@ namespace FluffyFox::Graphics
 			PhysicalDevice m_physicalDevice; // only represents the hardware
 			std::unique_ptr<Device> m_device;
 			std::unique_ptr<Surface> m_surface;
+			std::unique_ptr<Swapchain> m_swapchain;
 
 			void initWindow();
 			void initVulkan();
@@ -55,5 +57,6 @@ namespace FluffyFox::Graphics
 			bool checkDeviceExtensionSupport(const PhysicalDevice &device);
 			void createLogicalDevice();
 			void createSurface();
+			void createSwapchain();
 	};
 }

@@ -1,9 +1,11 @@
 #include "ffge_surface.hpp"
 #include "ffge_engine.hpp"
-#include "ffge_config.hpp"
 #include "ffge_device.hpp"
 #include "ffge_instance.hpp"
+#include "ffge_swapchain.hpp"
+#include "ffge_swapchainSupportDetails.hpp"
 #include "ffge_window.hpp"
+#include "ffge_queueFamilyIndices.hpp"
 
 #include <cstring>
 #include <iostream>
@@ -20,6 +22,7 @@ namespace FluffyFox::Graphics
 
 	Engine::~Engine()
 	{
+		m_swapchain.reset();
 		m_device.reset();
 		m_surface.reset();
 		m_instance.reset();
@@ -43,16 +46,20 @@ namespace FluffyFox::Graphics
 		createInstance();
 		setupDebugMessenger();
 		createSurface();
+		std::cout << "(engine) surface: " << m_surface->getHandle() << std::endl;
 		pickPhysicalDevice();
 		createLogicalDevice();
+		createSwapchain();
 	}
 
 	void Engine::createInstance()
 	{
-		if (FFGE_DEBUG && !checkValidationLayerSupport())
+		#ifndef NDEBUG
+		if (!checkValidationLayerSupport())
 		{
 			throw std::runtime_error("validation layers requested, but not available!");
 		}
+		#endif
 		m_instance = std::make_unique<Instance>(APP_NAME, APP_VERSION, validationLayers);
 	}
 
@@ -106,7 +113,7 @@ namespace FluffyFox::Graphics
 			std::cout << "Physical devices:\n";
 			for (const auto &device : devices)
 			{
-				std::cout << device.id() << ":\t" << device.name() << "\n";
+				std::cout << "\t" << device.id() << ":\t" << device.name() << "\n";
 			}
 		#endif
 
@@ -127,19 +134,44 @@ namespace FluffyFox::Graphics
 
 	bool Engine::isDeviceSuitable(const PhysicalDevice &device)
 	{
+		// queue family support
 		QueueFamilyIndices indices = device.findQueueFamilies(*m_surface);
+		bool hasRequiredQueueFamilies = indices.isComplete();
 
+		// extensions support
 		bool extensionsSupported = checkDeviceExtensionSupport(device);
 
-		return indices.isComplete() && extensionsSupported;
+		// swapchain support
+		bool swapchainAdequate = false;
+		if (extensionsSupported)
+		{
+			SwapchainSupportDetails swapchainSupport = m_physicalDevice.querySwapchainSupport(*m_surface);
+			swapchainAdequate = !swapchainSupport.formats.empty() && !swapchainSupport.presentModes.empty();
+		}
+
+		return hasRequiredQueueFamilies && extensionsSupported && swapchainAdequate;
 		// return device.isDedicatedGPU() && device.supportsGeometryShaders(); // INFO must be changed to accomodate for laptops.
 	}
 
 	bool Engine::checkDeviceExtensionSupport(const PhysicalDevice &device)
 	{
 		std::vector<VkExtensionProperties> availableExtensions = device.getAvailableExtensions();
+		#ifndef NDEBUG
+			std::cout << "device available extensions:\n";
+			for (const auto &availableExtension : availableExtensions)
+			{
+				std::cout << "\t" << availableExtension.extensionName << "\n";
+			}
+		#endif
 
 		std::set<std::string> requiredExtensions(m_deviceExtensions.begin(), m_deviceExtensions.end());
+		#ifndef NDEBUG
+			std::cout << "required extensions:\n";
+			for (const auto &requiredExtension : requiredExtensions)
+			{
+				std::cout << "\t" << requiredExtension << "\n";
+			}
+		#endif
 		for (const auto& extension : availableExtensions)
 		{
 			requiredExtensions.erase(extension.extensionName);
@@ -156,5 +188,10 @@ namespace FluffyFox::Graphics
 	void Engine::createSurface()
 	{
 		m_surface = m_window->createSurface(*m_instance);
+	}
+
+	void Engine::createSwapchain()
+	{
+		m_swapchain = std::make_unique<Swapchain>(m_physicalDevice, *m_surface, *m_window, *m_device);
 	}
 }
