@@ -10,6 +10,7 @@ build/fluffy_graphics_engine: $(SRCFILES)
 .PHONY: run clean
 
 run: build/fluffy_graphics_engine
+	./compile_shaders.sh
 	./build/fluffy_graphics_engine
 
 clean:

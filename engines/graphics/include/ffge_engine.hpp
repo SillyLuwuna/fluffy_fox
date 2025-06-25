@@ -59,5 +59,8 @@ namespace FluffyFox::Graphics
 			void createSurface();
 			void createSwapchain();
 			void createImageViews();
+			void createGraphicsPipeline();
+			static std::vector<char> readFile(const std::string &filename);
+			VkShaderModule createShaderModule(const std::vector<char> &bytecode);
 	};
 }

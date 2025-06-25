@@ -12,6 +12,7 @@
 #include <set>
 #include <vector>
 #include <stdexcept>
+#include <fstream>
 
 namespace FluffyFox::Graphics
 {
@@ -50,6 +51,7 @@ namespace FluffyFox::Graphics
 		createLogicalDevice();
 		createSwapchain();
 		createImageViews();
+		createGraphicsPipeline();
 	}
 
 	void Engine::createInstance()
@@ -198,5 +200,71 @@ namespace FluffyFox::Graphics
 	void Engine::createImageViews()
 	{
 		m_swapchain->createImageViews();
+	}
+
+	void Engine::createGraphicsPipeline()
+	{
+		std::vector<char> vertShaderCode = readFile("shaders/vert.spv");
+		std::vector<char> fragShaderCode = readFile("shaders/frag.spv");
+
+		VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+		VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+
+		VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+		vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+		vertShaderStageInfo.module = vertShaderModule;
+		vertShaderStageInfo.pName = "main";
+		vertShaderStageInfo.pSpecializationInfo = nullptr;
+		// INFO pSpecializationInfo could be used for shader constants, which could be used to specify behaviour of the shaders
+		// INFO this is *way* more efficient than writing the variables in the shaders, the compiler will
+		// INFO optimize the if statements of said variables
+
+		VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+		fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+		fragShaderStageInfo.module = fragShaderModule;
+		fragShaderStageInfo.pName = "main";
+		fragShaderStageInfo.pSpecializationInfo = nullptr;
+
+		VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+		vkDestroyShaderModule(m_device->getHandle(), fragShaderModule, nullptr);
+		vkDestroyShaderModule(m_device->getHandle(), vertShaderModule, nullptr);
+	}
+
+	VkShaderModule Engine::createShaderModule(const std::vector<char> &bytecode)
+	{
+		VkShaderModuleCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		createInfo.codeSize = bytecode.size();
+		createInfo.pCode = reinterpret_cast<const uint32_t *>(bytecode.data());
+
+		VkShaderModule shaderModule;
+		if (vkCreateShaderModule(m_device->getHandle(), &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
+		{
+			throw std::runtime_error("failed to create shader module!");
+		}
+
+		return shaderModule;
+	}
+
+	std::vector<char> Engine::readFile(const std::string &filename)
+	{
+		std::ifstream file(filename, std::ios::ate | std::ios::binary); // start reading at the end of file & read the file as a binary
+
+		if (!file.is_open())
+		{
+			throw std::runtime_error("failed to open file!");
+		}
+
+		size_t fileSize = (size_t) file.tellg(); // get read position to get length of file
+		std::vector<char> buffer(fileSize);
+
+		file.seekg(0); // return read position to start
+		file.read(buffer.data(), fileSize);
+
+		file.close();
+		return buffer;
 	}
 }
