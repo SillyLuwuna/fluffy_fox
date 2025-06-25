@@ -20,6 +20,8 @@ namespace FluffyFox::Graphics
 			Swapchain(const Swapchain &) = delete;
 			Swapchain &operator=(const Swapchain &) = delete;
 
+			void createImageViews();
+
 		private:
 			VkSurfaceFormatKHR chooseSwapchainSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
 			VkPresentModeKHR chooseSwapchainPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
@@ -27,6 +29,7 @@ namespace FluffyFox::Graphics
 			VkSwapchainKHR m_swapchain;
 			const Device &m_device;
 			std::vector<VkImage> m_images;
+			std::vector<VkImageView> m_swapchainImageViews;
 			VkFormat m_imageFormat;
 			VkExtent2D m_extent;
 	};

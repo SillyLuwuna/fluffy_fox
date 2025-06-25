@@ -49,6 +49,7 @@ namespace FluffyFox::Graphics
 		pickPhysicalDevice();
 		createLogicalDevice();
 		createSwapchain();
+		createImageViews();
 	}
 
 	void Engine::createInstance()
@@ -192,5 +193,10 @@ namespace FluffyFox::Graphics
 	void Engine::createSwapchain()
 	{
 		m_swapchain = std::make_unique<Swapchain>(m_physicalDevice, *m_surface, *m_window, *m_device);
+	}
+
+	void Engine::createImageViews()
+	{
+		m_swapchain->createImageViews();
 	}
 }

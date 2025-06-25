@@ -58,5 +58,6 @@ namespace FluffyFox::Graphics
 			void createLogicalDevice();
 			void createSurface();
 			void createSwapchain();
+			void createImageViews();
 	};
 }
