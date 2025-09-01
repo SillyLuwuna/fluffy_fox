@@ -12,6 +12,7 @@
 #include <set>
 #include <vector>
 #include <stdexcept>
+#include <fstream>
 
 namespace FluffyFox::Graphics
 {

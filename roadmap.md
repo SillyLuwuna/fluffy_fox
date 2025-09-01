@@ -25,37 +25,43 @@
 - [ ] Image views
 
 #### Milestone: v0.0.8
-- [ ] Render pass
+- [ ] Shader modules
 
 #### Milestone: v0.0.9
-- [ ] Graphics pipeline
+- [ ] Fixed functions
 
 #### Milestone: v0.0.10
+- [ ] Render passes
+
+#### Milestone: v0.0.11
+- [ ] Graphics pipeline
+
+#### Milestone: v0.0.12
 - [ ] Framebuffers
 
-#### Milestone: v0.0.11 <---- TRIANGLE
+#### Milestone: v0.0.13 <---- TRIANGLE
 - [ ] Command pool
 - [ ] Command buffer
 
-#### Milestone: v0.0.12 <---- CUSTOM GEOMETRY
+#### Milestone: v0.0.14 <---- CUSTOM GEOMETRY
 - [ ] Load obj file
 
-#### Milestone: v0.0.13
+#### Milestone: v0.0.15
 - [ ] Manage GPU memory
 
-#### Milestone: v0.0.14 <---- TEXTURES
+#### Milestone: v0.0.16 <---- TEXTURES
 - [ ] Load textures
 
-#### Milestone: v0.0.15
+#### Milestone: v0.0.17
 - [ ] Uniform buffers
 
-#### Milestone: v0.0.16 <---- SHADOWS
+#### Milestone: v0.0.18 <---- SHADOWS
 - [ ] Shadow mapping
 
-#### Milestone: v0.0.17
+#### Milestone: v0.0.19
 - [ ] Load skeletal data
 
-#### Milestone: v0.0.18 <---- ANIMATIONS
+#### Milestone: v0.0.20 <---- ANIMATIONS
 - [ ] GPU skinning
 
 ### Milestone: v0.1.0

@@ -26,3 +26,4 @@ https://www.youtube.com/watch?v=EsEP9iJKBhU&list=PLA0dXqQjCx0RntJy1pqje9uHRF1Z5v
 ## Notes
 - game like WEBFISHING
 - has lot's of (NON P2W) rng, collect pretty cards? maybe armor? pets? who knows
+- include shader compiler as a library to produce the GPU code at runtime? (is it useful or not?)
