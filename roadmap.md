@@ -10,16 +10,16 @@
 - [x] Create a vulkan instance
 
 #### Milestone: v0.0.3
-- [x] Physical device
+- [ ] Physical device
 
 #### Milestone: v0.0.4
-- [x] Logical device
+- [ ] Logical device
 
 #### Milestone: v0.0.5
-- [x] Create a window surface
+- [ ] Create a window surface
 
 #### Milestone: v0.0.6
-- [x] Swapchain
+- [ ] Swapchain
 
 #### Milestone: v0.0.7
 - [ ] Image views

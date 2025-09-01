@@ -1,5 +1,8 @@
+-std=c++20
 -Wall
 -Wextra
 -Wpedantic
+-DVULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 -I
 include
+-D__INTELLISENSE__

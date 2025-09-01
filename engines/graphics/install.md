@@ -3,6 +3,7 @@
 - vulkan-devel
 ## GLFW (window)
 - glfw
+- glfw-wayland
 ## linear algebra library
 - glm
 ## shader compilation

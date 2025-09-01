@@ -1,0 +1,20 @@
+# ninja log v6
+1	208	1756705189812369503	CMakeFiles/VulkanCppModule.dir/usr/include/vulkan/vulkan.cppm.o.ddi	f1b3f123f1d681f5
+1	5	1756705384737382899	CMakeFiles/VulkanCppModule.dir/CXX.dd	6cb6913c85c38335
+1	5	1756705384737382899	CMakeFiles/VulkanCppModule.dir/CXXModules.json	6cb6913c85c38335
+5	9	1756705384742322989	CMakeFiles/FluffyFoxGraphicsEngine.dir/CXX.dd	b3b685ad1337eb06
+1	5	1756705384737382899	CMakeFiles/VulkanCppModule.dir/usr/include/vulkan/vulkan.cppm.o.modmap	6cb6913c85c38335
+1	54	1756705303812033203	CMakeFiles/FluffyFoxGraphicsEngine.dir/src/main.cpp.o.ddi	23b8584627608955
+5	9	1756705384742322989	CMakeFiles/FluffyFoxGraphicsEngine.dir/CXXModules.json	b3b685ad1337eb06
+5	9	1756705384742322989	CMakeFiles/FluffyFoxGraphicsEngine.dir/src/main.cpp.o.modmap	b3b685ad1337eb06
+3579	3597	1756705307390279095	libVulkanCppModule.a	383ca6bdcb33dd9c
+5	3579	1756705307389377583	CMakeFiles/VulkanCppModule.dir/usr/include/vulkan/vulkan.cppm.o	69e9e071e2fa17bf
+3579	4088	1756705307390561164	CMakeFiles/FluffyFoxGraphicsEngine.dir/src/main.cpp.o	9c8b0160489c24ab
+5	3579	1756705307389377583	CMakeFiles/VulkanCppModule.dir/vulkan_hpp.gcm	69e9e071e2fa17bf
+0	5	1756705510007391507	CMakeFiles/VulkanCppModule.dir/CXX.dd	6cb6913c85c38335
+0	5	1756705510007391507	CMakeFiles/VulkanCppModule.dir/CXXModules.json	6cb6913c85c38335
+0	5	1756705510007391507	CMakeFiles/VulkanCppModule.dir/usr/include/vulkan/vulkan.cppm.o.modmap	6cb6913c85c38335
+5	9	1756705510013192867	CMakeFiles/FluffyFoxGraphicsEngine.dir/CXX.dd	b3b685ad1337eb06
+5	9	1756705510013192867	CMakeFiles/FluffyFoxGraphicsEngine.dir/CXXModules.json	b3b685ad1337eb06
+5	9	1756705510013192867	CMakeFiles/FluffyFoxGraphicsEngine.dir/src/main.cpp.o.modmap	b3b685ad1337eb06
+9	35	1756705510017126322	FluffyFoxGraphicsEngine	3210615ed1e498da
