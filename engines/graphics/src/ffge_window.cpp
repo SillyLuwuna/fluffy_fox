@@ -1,6 +1,6 @@
 #include "ffge_window.hpp"
-#include "ffge_surface.hpp"
-#include <iostream>
+// #include "ffge_surface.hpp"
+// #include <iostream>
 
 namespace FluffyFox::Graphics
 {
@@ -31,8 +31,8 @@ namespace FluffyFox::Graphics
 		return glfwWindowShouldClose(m_window);
 	}
 
-	std::unique_ptr<Surface> Window::createSurface(Instance &instance)
-	{
-		return std::make_unique<Surface>(instance, *this);
-	}
+	// std::unique_ptr<Surface> Window::createSurface(Instance &instance)
+	// {
+	// 	return std::make_unique<Surface>(instance, *this);
+	// }
 }

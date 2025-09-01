@@ -26,7 +26,7 @@ namespace FluffyFox::Graphics
 				return m_window;
 			}
 
-			std::unique_ptr<Surface> createSurface(Instance &instance);
+			// std::unique_ptr<Surface> createSurface(Instance &instance);
 
 		private:
 			const int m_width;
