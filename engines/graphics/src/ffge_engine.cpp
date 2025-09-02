@@ -1,35 +1,21 @@
 #include "ffge_engine.hpp"
-#include "ffge_window.hpp"
-// #include "ffge_surface.hpp"
-// #include "ffge_device.hpp"
-// #include "ffge_instance.hpp"
-// #include "ffge_swapchain.hpp"
-// #include "ffge_swapchainSupportDetails.hpp"
-// #include "ffge_queueFamilyIndices.hpp"
 
 #include <cstring>
 #include <iostream>
-#include <set>
+#include <map>
 #include <vector>
 #include <stdexcept>
+#include <memory>
 
 namespace FluffyFox::Graphics
 {
-	// Engine::Engine() : m_physicalDevice()
 	Engine::Engine() :
+		m_window(nullptr),
 		m_instance(nullptr),
-		m_debugMessenger(nullptr)
+		m_debugMessenger(nullptr),
+		m_physicalDevice(nullptr)
 	{
 
-	}
-
-	Engine::~Engine()
-	{
-	// 	m_swapchain.reset();
-	// 	m_device.reset();
-	// 	m_surface.reset();
-	// 	m_instance.reset();
-	// 	m_window.reset();
 	}
 
 	void Engine::run()
@@ -48,10 +34,7 @@ namespace FluffyFox::Graphics
 	{
 		createInstance();
 		setupDebugMessenger();
-	// 	createSurface();
-	// 	pickPhysicalDevice();
-	// 	createLogicalDevice();
-	// 	createSwapchain();
+		pickPhysicalDevice();
 	}
 
 	void Engine::mainLoop()
@@ -171,135 +154,111 @@ namespace FluffyFox::Graphics
 		};
 		m_debugMessenger = m_instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT);}
 
-	// bool Engine::checkValidationLayerSupport()
-	// {
-	// 	uint32_t layerCount;
-	// 	vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-	//
-	// 	std::vector<VkLayerProperties> availableLayers(layerCount);
-	// 	vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-	//
-	// 	for (const char *layerName : validationLayers)
-	// 	{
-	// 		bool layerFound = false;
-	// 		for (const auto &layerProperties : availableLayers)
-	// 		{
-	// 			if (strcmp(layerName, layerProperties.layerName) == 0)
-	// 			{
-	// 				layerFound = true;
-	// 				break;
-	// 			}
-	// 		}
-	//
-	// 		if (!layerFound)
-	// 		{
-	// 			return false;
-	// 		}
-	// 	}
-	//
-	// 	return true;
-	// }
-	//
-	// void Engine::mainLoop()
-	// {
-	// 	while (!m_window->shouldClose())
-	// 	{
-	// 		glfwPollEvents();
-	// 	}
-	// }
-	//
-	// void Engine::setupDebugMessenger()
-	// {
-	// 	m_instance->setupDebugMessenger();
-	// }
-	//
-	// void Engine::pickPhysicalDevice()
-	// {
-	// 	std::vector<PhysicalDevice> devices = m_instance->getPhysicalDevices();
-	//
-	// 	#ifndef NDEBUG
-	// 		std::cout << "Physical devices:\n";
-	// 		for (const auto &device : devices)
-	// 		{
-	// 			std::cout << "\t" << device.id() << ":\t" << device.name() << "\n";
-	// 		}
-	// 	#endif
-	//
-	// 	for (const PhysicalDevice& device : devices)
-	// 	{
-	// 		if (isDeviceSuitable(device))
-	// 		{
-	// 			m_physicalDevice = device;
-	// 			break;
-	// 		}
-	// 	}
-	//
-	// 	if (m_physicalDevice.isNull())
-	// 	{
-	// 		throw std::runtime_error("failed to find a suitable GPU!");
-	// 	}
-	// }
-	//
-	// bool Engine::isDeviceSuitable(const PhysicalDevice &device)
-	// {
-	// 	// queue family support
-	// 	QueueFamilyIndices indices = device.findQueueFamilies(*m_surface);
-	// 	bool hasRequiredQueueFamilies = indices.isComplete();
-	//
-	// 	// extensions support
-	// 	bool extensionsSupported = checkDeviceExtensionSupport(device);
-	//
-	// 	// swapchain support
-	// 	bool swapchainAdequate = false;
-	// 	if (extensionsSupported)
-	// 	{
-	// 		SwapchainSupportDetails swapchainSupport = device.querySwapchainSupport(*m_surface);
-	// 		swapchainAdequate = !swapchainSupport.formats.empty() && !swapchainSupport.presentModes.empty();
-	// 	}
-	//
-	// 	return hasRequiredQueueFamilies && extensionsSupported && swapchainAdequate;
-	// 	// return device.isDedicatedGPU() && device.supportsGeometryShaders(); // INFO must be changed to accomodate for laptops.
-	// }
-	//
-	// bool Engine::checkDeviceExtensionSupport(const PhysicalDevice &device)
-	// {
-	// 	std::vector<VkExtensionProperties> availableExtensions = device.getAvailableExtensions();
-	// 	#ifndef NDEBUG
-	// 		// std::cout << "device available extensions:\n";
-	// 		// for (const auto &availableExtension : availableExtensions)
-	// 		// {
-	// 		// 	std::cout << "\t" << availableExtension.extensionName << "\n";
-	// 		// }
-	// 	#endif
-	//
-	// 	std::set<std::string> requiredExtensions(m_deviceExtensions.begin(), m_deviceExtensions.end());
-	// 	#ifndef NDEBUG
-	// 		// std::cout << "required extensions:\n";
-	// 		// for (const auto &requiredExtension : requiredExtensions)
-	// 		// {
-	// 		// 	std::cout << "\t" << requiredExtension << "\n";
-	// 		// }
-	// 	#endif
-	// 	for (const auto& extension : availableExtensions)
-	// 	{
-	// 		requiredExtensions.erase(extension.extensionName);
-	// 	}
-	//
-	// 	return requiredExtensions.empty();
-	// }
-	//
-	// void Engine::createLogicalDevice()
-	// {
-	// 	m_device = std::make_unique<Device>(m_physicalDevice, *m_surface, m_deviceExtensions);
-	// }
-	//
-	// void Engine::createSurface()
-	// {
-	// 	m_surface = m_window->createSurface(*m_instance);
-	// }
-	//
-	// void Engine::createSwapchain()
-	// {
-	// 	m_swapchain = std::make_unique<Swapchain>(m_physicalDevice, *m_surface, *m_window, *m_device);
-	// }
+	void Engine::pickPhysicalDevice()
+	{
+		std::vector<vk::raii::PhysicalDevice> devices = m_instance.enumeratePhysicalDevices();
+		// if (devices.empty())
+		// {
+		// 	throw std::runtime_error("failed to find GPUs with Vulkan support!");
+		// }
+
+		// for (const auto& device : devices)
+		// {
+		// vk::PhysicalDeviceProperties deviceProperties = device.getProperties();
+		// vk::PhysicalDeviceFeatures deviceFeatures = device.getFeatures();
+		// FIXME refactor, complete code gore
+		const auto devIter = std::ranges::find_if(devices,
+			[&](auto const &device) {
+				// checks for api version
+				bool isSuitable = device.getProperties().apiVersion >= VK_API_VERSION_1_3;
+				auto queueFamilies = device.getQueueFamilyProperties();
+				const auto qfpIter = std::ranges::find_if(queueFamilies,
+					[](vk::QueueFamilyProperties const &qfp) {
+						// checks if GPU supports graphic operations
+						return (qfp.queueFlags & vk::QueueFlagBits::eGraphics) != static_cast<vk::QueueFlags>(0);
+					}
+				);
+				isSuitable = isSuitable && (qfpIter != queueFamilies.end());
+				auto extensions = device.enumerateDeviceExtensionProperties();
+				bool found = true;
+				for (auto const &extension : DEVICE_EXTENSIONS)
+				{
+					auto extensionIter = std::ranges::find_if(extensions,
+						[extension](auto const &ext) {
+							// must have extensions in DEVICE_EXTENSIONS
+							return strcmp(ext.extensionName, extension) == 0;
+						}
+					);
+					found = found && extensionIter != extensions.end();
+				}
+				isSuitable = isSuitable && found;
+				if (isSuitable)
+				{
+					m_physicalDevice = device;
+				}
+				return isSuitable;
+			}
+		);
+		if (devIter == devices.end())
+		{
+			throw std::runtime_error("failed to find a suitable GPU!");
+		}
+		std::cout << "GPU: " << m_physicalDevice.getProperties().deviceName << '\n';
+		// uint32_t score = 0;
+		//
+		// // Discrete GPUs are better than integrated ones.
+		// if (deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
+		// {
+		// 	score += 1000;
+		// }
+		//
+		// // Maximum possible size of textures affects grpahics quality
+		// score += deviceProperties.limits.maxImageDimension2D;
+		//
+		// // Application can't function without geometry shaders
+		// if (!deviceFeatures.geometryShader)
+		// {
+		// 	continue;
+		// }
+		// candidates.insert(std::make_pair(score, device));
+		//
+		// if (!candidates.empty() && candidates.rbegin()->first > 0)
+		// {
+		// 	m_physicalDevice = std::move(candidates.rbegin()->second);
+		// }
+		// else
+		// {
+		// 	throw std::runtime_error("failed to find a suitable GPU!");
+		// }
+	}
+
+	// FIXME not used at all?
+	uint32_t Engine::findQueueFamilies(const VkPhysicalDevice &device) const
+	{
+		// find the index of the first queue family that supports graphics
+		std::vector<vk::QueueFamilyProperties> queueFamilyProperties = m_physicalDevice.getQueueFamilyProperties();
+
+		// get the first index into queueFamilyProperties which supports graphics
+		auto graphicsQueueFamilyProperty = std::find_if(queueFamilyProperties.begin(), queueFamilyProperties.end(),
+			[](vk::QueueFamilyProperties const &qfp) {
+				return qfp.queueFlags & vk::QueueFlagBits::eGraphics;
+			}
+		);
+
+		return static_cast<uint32_t>(std::distance(queueFamilyProperties.begin(), graphicsQueueFamilyProperty));
+	}
+
+	// FIXME not used at all?
+	bool Engine::isDeviceSuitable(const vk::raii::PhysicalDevice &device) const
+	{
+		vk::PhysicalDeviceProperties deviceProperties = device.getProperties();
+		vk::PhysicalDeviceFeatures deviceFeatures = device.getFeatures();
+
+		if (deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu && deviceFeatures.geometryShader)
+		{
+			// m_physicalDevice = std::move(device);
+			// break;
+		}
+		return true;
+	}
 }

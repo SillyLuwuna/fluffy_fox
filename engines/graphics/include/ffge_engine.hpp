@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include "ffge_window.hpp"
 #include <algorithm>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -17,17 +18,10 @@ import vulkan_hpp;
 
 namespace FluffyFox::Graphics
 {
-	class Device;
-	class Surface;
-	class Window;
-	class Instance;
-	class Swapchain;
-
 	class Engine
 	{
 		public:
 			Engine();
-			~Engine();
 
 			Engine(const Engine &) = delete;
 			Engine &operator=(const Engine &) = delete;
@@ -35,6 +29,7 @@ namespace FluffyFox::Graphics
 			void run();
 
 		private:
+			// constants
 			const uint32_t WIDTH = 800;
 			const uint32_t HEIGHT = 600;
 			const std::string TITLE = "Vulkan";
@@ -43,45 +38,36 @@ namespace FluffyFox::Graphics
 			const std::vector<char const*> VALIDATION_LAYERS = {
 				"VK_LAYER_KHRONOS_validation"
 			};
+			const std::vector<const char*> DEVICE_EXTENSIONS= {
+				vk::KHRSwapchainExtensionName,
+				vk::KHRSpirv14ExtensionName,
+				vk::KHRSynchronization2ExtensionName,
+				vk::KHRCreateRenderpass2ExtensionName
+			};
 			#ifdef NDEBUG
 			static constexpr bool enableValidationLayers = false;
 			#else
 			static constexpr bool enableValidationLayers = true;
 			#endif
-			// const std::vector<const char*> validationLayers = {
-			// 	"VK_LAYER_KHRONOS_validation"
-			// };
-			// const std::vector<const char*> m_deviceExtensions = {
-			// 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
-			// }; // required extensions for the host gpu
-			//
+
+			// member variables
 			std::unique_ptr<Window> m_window;
 			vk::raii::Context m_context;
 			vk::raii::Instance m_instance;
 			vk::raii::DebugUtilsMessengerEXT m_debugMessenger;
+			vk::raii::PhysicalDevice m_physicalDevice;
 
-			// std::unique_ptr<Instance> m_instance;
-			// PhysicalDevice m_physicalDevice; // only represents the hardware
-			// std::unique_ptr<Device> m_device;
-			// std::unique_ptr<Surface> m_surface;
-			// std::unique_ptr<Swapchain> m_swapchain;
-			//
+			// functions
+			static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
+				vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT * pCallbackData, void*);
 			void initWindow();
 			void initVulkan();
 			void mainLoop();
 			void createInstance();
 			void setupDebugMessenger();
+			void pickPhysicalDevice();
+			bool isDeviceSuitable(const vk::raii::PhysicalDevice &device) const;
+			uint32_t findQueueFamilies(const VkPhysicalDevice &device) const;
 			std::vector<const char*> getRequiredExtensions();
-			static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
-				vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT * pCallbackData, void*);
-			// void cleanup();
-			// bool checkValidationLayerSupport();
-			// void setupDebugMessenger();
-			// void pickPhysicalDevice();
-			// bool isDeviceSuitable(const PhysicalDevice &device);
-			// bool checkDeviceExtensionSupport(const PhysicalDevice &device);
-			// void createLogicalDevice();
-			// void createSurface();
-			// void createSwapchain();
 	};
 }
