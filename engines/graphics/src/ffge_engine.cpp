@@ -3,6 +3,7 @@
 #include <cstring>
 #include <iostream>
 #include <map>
+#include <set>
 #include <vector>
 #include <stdexcept>
 #include <memory>
@@ -13,7 +14,11 @@ namespace FluffyFox::Graphics
 		m_window(nullptr),
 		m_instance(nullptr),
 		m_debugMessenger(nullptr),
-		m_physicalDevice(nullptr)
+		m_physicalDevice(nullptr),
+		m_device(nullptr),
+		m_graphicsQueue(nullptr),
+		m_presentQueue(nullptr),
+		m_surface(nullptr)
 	{
 
 	}
@@ -34,7 +39,9 @@ namespace FluffyFox::Graphics
 	{
 		createInstance();
 		setupDebugMessenger();
+		createSurface();
 		pickPhysicalDevice();
+		createLogicalDevice();
 	}
 
 	void Engine::mainLoop()
@@ -152,7 +159,18 @@ namespace FluffyFox::Graphics
 			.messageType = messageTypeFlags,
 			.pfnUserCallback = &debugCallback
 		};
-		m_debugMessenger = m_instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT);}
+		m_debugMessenger = m_instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT);
+	}
+
+	void Engine::createSurface()
+	{
+		VkSurfaceKHR surface;
+		if (glfwCreateWindowSurface(*m_instance, m_window->getHandle(), nullptr, &surface) != 0)
+		{
+			throw std::runtime_error("failed to create window surface!");
+		}
+		m_surface = vk::raii::SurfaceKHR(m_instance, surface);
+	}
 
 	void Engine::pickPhysicalDevice()
 	{
@@ -181,7 +199,7 @@ namespace FluffyFox::Graphics
 				isSuitable = isSuitable && (qfpIter != queueFamilies.end());
 				auto extensions = device.enumerateDeviceExtensionProperties();
 				bool found = true;
-				for (auto const &extension : DEVICE_EXTENSIONS)
+				for (auto const &extension : REQUIRED_DEVICE_EXTENSIONS)
 				{
 					auto extensionIter = std::ranges::find_if(extensions,
 						[extension](auto const &ext) {
@@ -260,5 +278,86 @@ namespace FluffyFox::Graphics
 			// break;
 		}
 		return true;
+	}
+
+	void Engine::createLogicalDevice()
+	{
+		// find the index of the first queue family that supports graphics and presenting
+		std::vector<vk::QueueFamilyProperties> queueFamilyProperties = m_physicalDevice.getQueueFamilyProperties();
+		uint32_t graphicsIndex = ~0;
+		uint32_t presentIndex = ~0;
+		for (uint32_t i = 0; i < queueFamilyProperties.size(); i++)
+		{
+			bool supportsGraphics = static_cast<bool>(queueFamilyProperties[i].queueFlags & vk::QueueFlagBits::eGraphics);
+			bool supportsPresent = m_physicalDevice.getSurfaceSupportKHR(i, *m_surface);
+
+			if (supportsGraphics && supportsPresent)
+			{
+				// most efficient
+				graphicsIndex = i;
+				presentIndex = i;
+				break;
+			}
+			else if (supportsGraphics)
+			{
+				graphicsIndex = i;
+			}
+			else if (supportsPresent)
+			{
+				presentIndex = i;
+			}
+		}
+
+		if (graphicsIndex == ~0u)
+		{
+			throw std::runtime_error("Could not find a queue for graphics!");
+		}
+		else if (presentIndex == ~0u)
+		{
+			throw std::runtime_error("Could not find a queue for presenting!");
+		}
+		else if (graphicsIndex == presentIndex)
+		{
+			std::cout << "Found a queue family for simultaneous graphics and presenting!\n";
+		}
+		else
+		{
+			std::cout << "Using different queue families for graphics and presenting...\n";
+		}
+
+		// query for Vulkan 1.3 features
+		vk::StructureChain<vk::PhysicalDeviceFeatures2,
+			vk::PhysicalDeviceVulkan13Features,
+			vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = {
+				{},
+				{ .dynamicRendering = true },
+				{ .extendedDynamicState = true }
+		};
+
+		// create a Device
+		std::set<uint32_t> uniqueQueueFamilies = { graphicsIndex, presentIndex };
+		std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
+		float queuePriority = 0.0f;
+
+		for (uint32_t queueFamily : uniqueQueueFamilies)
+		{
+			queueCreateInfos.push_back(vk::DeviceQueueCreateInfo {
+				.queueFamilyIndex = queueFamily,
+				.queueCount = 1,
+				.pQueuePriorities = &queuePriority
+			});
+		}
+
+		vk::DeviceCreateInfo deviceCreateInfo {
+			.pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(),
+			.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
+			.pQueueCreateInfos = queueCreateInfos.data(),
+			.enabledExtensionCount = static_cast<uint32_t>(REQUIRED_DEVICE_EXTENSIONS.size()),
+			.ppEnabledExtensionNames = REQUIRED_DEVICE_EXTENSIONS.data()
+		};
+
+		m_device = vk::raii::Device(m_physicalDevice, deviceCreateInfo);
+		m_graphicsQueue = vk::raii::Queue(m_device, graphicsIndex, 0);
+		m_presentQueue = vk::raii::Queue(m_device, presentIndex, 0);
 	}
 }

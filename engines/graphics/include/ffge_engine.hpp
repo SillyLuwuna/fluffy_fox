@@ -38,12 +38,13 @@ namespace FluffyFox::Graphics
 			const std::vector<char const*> VALIDATION_LAYERS = {
 				"VK_LAYER_KHRONOS_validation"
 			};
-			const std::vector<const char*> DEVICE_EXTENSIONS= {
+			const std::vector<const char*> REQUIRED_DEVICE_EXTENSIONS = {
 				vk::KHRSwapchainExtensionName,
 				vk::KHRSpirv14ExtensionName,
 				vk::KHRSynchronization2ExtensionName,
 				vk::KHRCreateRenderpass2ExtensionName
 			};
+
 			#ifdef NDEBUG
 			static constexpr bool enableValidationLayers = false;
 			#else
@@ -56,6 +57,10 @@ namespace FluffyFox::Graphics
 			vk::raii::Instance m_instance;
 			vk::raii::DebugUtilsMessengerEXT m_debugMessenger;
 			vk::raii::PhysicalDevice m_physicalDevice;
+			vk::raii::Device m_device;
+			vk::raii::Queue m_graphicsQueue;
+			vk::raii::Queue m_presentQueue;
+			vk::raii::SurfaceKHR m_surface;
 
 			// functions
 			static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -65,7 +70,9 @@ namespace FluffyFox::Graphics
 			void mainLoop();
 			void createInstance();
 			void setupDebugMessenger();
+			void createSurface();
 			void pickPhysicalDevice();
+			void createLogicalDevice();
 			bool isDeviceSuitable(const vk::raii::PhysicalDevice &device) const;
 			uint32_t findQueueFamilies(const VkPhysicalDevice &device) const;
 			std::vector<const char*> getRequiredExtensions();
