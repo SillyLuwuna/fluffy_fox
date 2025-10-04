@@ -7,6 +7,8 @@
 #include <string>
 #include "ffge_window.hpp"
 #include <algorithm>
+#include <cstdint>
+#include <limits>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -59,8 +61,12 @@ namespace FluffyFox::Graphics
 			vk::raii::PhysicalDevice m_physicalDevice;
 			vk::raii::Device m_device;
 			vk::raii::Queue m_graphicsQueue;
+			uint32_t m_graphicsFamily;
 			vk::raii::Queue m_presentQueue;
+			uint32_t m_presentFamily;
 			vk::raii::SurfaceKHR m_surface;
+			vk::SurfaceFormatKHR m_swapchainSurfaceFormat;
+			vk::Extent2D m_swapchainExtent;
 
 			// functions
 			static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -76,5 +82,9 @@ namespace FluffyFox::Graphics
 			bool isDeviceSuitable(const vk::raii::PhysicalDevice &device) const;
 			uint32_t findQueueFamilies(const VkPhysicalDevice &device) const;
 			std::vector<const char*> getRequiredExtensions();
+			void createSwapchain();
+			vk::SurfaceFormatKHR chooseSwapchainSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats);
+			vk::PresentModeKHR chooseSwapchainPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes);
+			vk::Extent2D chooseSwapchainSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities);
 	};
 }

@@ -7,6 +7,10 @@
 #include <vector>
 #include <stdexcept>
 #include <memory>
+#include <cstdint>
+#include <limits>
+#include <algorithm>
+
 
 namespace FluffyFox::Graphics
 {
@@ -17,10 +21,11 @@ namespace FluffyFox::Graphics
 		m_physicalDevice(nullptr),
 		m_device(nullptr),
 		m_graphicsQueue(nullptr),
+		m_graphicsFamily(~0u),
 		m_presentQueue(nullptr),
+		m_presentFamily(~0u),
 		m_surface(nullptr)
 	{
-
 	}
 
 	void Engine::run()
@@ -42,6 +47,7 @@ namespace FluffyFox::Graphics
 		createSurface();
 		pickPhysicalDevice();
 		createLogicalDevice();
+		createSwapchain();
 	}
 
 	void Engine::mainLoop()
@@ -358,6 +364,103 @@ namespace FluffyFox::Graphics
 
 		m_device = vk::raii::Device(m_physicalDevice, deviceCreateInfo);
 		m_graphicsQueue = vk::raii::Queue(m_device, graphicsIndex, 0);
+		m_graphicsFamily = graphicsIndex;
 		m_presentQueue = vk::raii::Queue(m_device, presentIndex, 0);
+		m_presentFamily = presentIndex;
+	}
+
+	void Engine::createSwapchain()
+	{
+		vk::SurfaceCapabilitiesKHR surfaceCapabilities = m_physicalDevice.getSurfaceCapabilitiesKHR(m_surface);
+		m_swapchainSurfaceFormat = chooseSwapchainSurfaceFormat(m_physicalDevice.getSurfaceFormatsKHR(m_surface));
+		m_swapchainExtent = chooseSwapchainSwapExtent(surfaceCapabilities);
+		vk::PresentModeKHR presentMode = chooseSwapchainPresentMode(m_physicalDevice.getSurfacePresentModesKHR(m_surface));
+		uint32_t minImageCount = std::max(3u, surfaceCapabilities.minImageCount); // getting a good amount of image counts
+		if (surfaceCapabilities.maxImageCount > 0 && minImageCount > surfaceCapabilities.maxImageCount) // fallback if image count was too high
+		{
+			minImageCount = surfaceCapabilities.maxImageCount;
+		}
+
+		vk::SwapchainCreateInfoKHR swapchainCreateInfo {
+			.flags = vk::SwapchainCreateFlagsKHR(),
+			.surface = m_surface,
+			.minImageCount = minImageCount,
+			.imageFormat = m_swapchainSurfaceFormat.format,
+			.imageColorSpace = m_swapchainSurfaceFormat.colorSpace,
+			.imageExtent = m_swapchainExtent,
+			.imageArrayLayers = 1,
+			.imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
+			.imageSharingMode = vk::SharingMode::eExclusive,
+			.preTransform = surfaceCapabilities.currentTransform,
+			.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
+			.presentMode = presentMode,
+			.clipped = true,
+			.oldSwapchain = nullptr
+		};
+
+		if (m_graphicsFamily == ~0u || m_presentFamily == ~0u)
+		{
+			throw std::runtime_error("graphicsFamily/presentFamily non initialized");
+		}
+		uint32_t queueFamilyIndices[] = {m_graphicsFamily, m_presentFamily};
+
+		if (m_graphicsFamily != m_presentFamily)
+		{
+			swapchainCreateInfo.imageSharingMode = vk::SharingMode::eConcurrent;
+			swapchainCreateInfo.queueFamilyIndexCount = 2;
+			swapchainCreateInfo.pQueueFamilyIndices = queueFamilyIndices;
+		}
+		else
+		{
+			swapchainCreateInfo.imageSharingMode = vk::SharingMode::eExclusive; // most performant
+			swapchainCreateInfo.queueFamilyIndexCount = 0; // Optional
+			swapchainCreateInfo.pQueueFamilyIndices = nullptr; // Optional
+		}
+	}
+
+	// surface format (color depth)
+	vk::SurfaceFormatKHR Engine::chooseSwapchainSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats)
+	{
+		for (const vk::SurfaceFormatKHR &availableFormat : availableFormats)
+		{
+			if (availableFormat.format == vk::Format::eB8G8R8A8Srgb
+				&& availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
+			{
+				std::cout << "Using srgb.\n";
+				return availableFormat;
+			}
+		}
+		return availableFormats[0];
+	}
+
+	// present mode (conditions for "swapping" images to the screen)
+	vk::PresentModeKHR Engine::chooseSwapchainPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes)
+	{
+		for (const vk::PresentModeKHR &availablePresentMode : availablePresentModes)
+		{
+			// if (availablePresentMode == vk::PresentModeKHR::eMailbox)
+			if (availablePresentMode == vk::PresentModeKHR::eImmediate) // tearing
+			{
+				return availablePresentMode;
+			}
+		}
+		return vk::PresentModeKHR::eFifo; // always available by default
+	}
+
+	// swap extent (resolution of images)
+	vk::Extent2D Engine::chooseSwapchainSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities)
+	{
+		// if window manager allows us to set whatever we want
+		if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
+		{
+			return capabilities.currentExtent;
+		}
+		int width, height;
+		glfwGetFramebufferSize(m_window->getHandle(), &width, &height);
+
+		return {
+			std::clamp<uint32_t>(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
+			std::clamp<uint32_t>(height, capabilities.minImageExtent.height, capabilities.minImageExtent.height)
+		};
 	}
 }
