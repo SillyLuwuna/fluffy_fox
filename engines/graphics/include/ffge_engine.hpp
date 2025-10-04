@@ -67,6 +67,8 @@ namespace FluffyFox::Graphics
 			vk::raii::SurfaceKHR m_surface;
 			vk::SurfaceFormatKHR m_swapchainSurfaceFormat;
 			vk::Extent2D m_swapchainExtent;
+			vk::raii::SwapchainKHR m_swapchain;
+			std::vector<vk::Image> m_swapchainImages;
 
 			// functions
 			static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity,

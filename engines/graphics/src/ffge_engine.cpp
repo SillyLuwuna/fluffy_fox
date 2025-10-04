@@ -24,7 +24,11 @@ namespace FluffyFox::Graphics
 		m_graphicsFamily(~0u),
 		m_presentQueue(nullptr),
 		m_presentFamily(~0u),
-		m_surface(nullptr)
+		m_surface(nullptr),
+		m_swapchainSurfaceFormat(vk::Format::eUndefined),
+		m_swapchainExtent(),
+		m_swapchain(nullptr),
+		m_swapchainImages()
 	{
 	}
 
@@ -394,7 +398,7 @@ namespace FluffyFox::Graphics
 			.preTransform = surfaceCapabilities.currentTransform,
 			.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
 			.presentMode = presentMode,
-			.clipped = true,
+			.clipped = vk::True,
 			.oldSwapchain = nullptr
 		};
 
@@ -404,7 +408,8 @@ namespace FluffyFox::Graphics
 		}
 		uint32_t queueFamilyIndices[] = {m_graphicsFamily, m_presentFamily};
 
-		if (m_graphicsFamily != m_presentFamily)
+		if (m_graphicsFamily != m_presentFamily) // uses concurrent sharing when the queue families are different (needed)
+												 // however this requires special handling
 		{
 			swapchainCreateInfo.imageSharingMode = vk::SharingMode::eConcurrent;
 			swapchainCreateInfo.queueFamilyIndexCount = 2;
@@ -416,6 +421,9 @@ namespace FluffyFox::Graphics
 			swapchainCreateInfo.queueFamilyIndexCount = 0; // Optional
 			swapchainCreateInfo.pQueueFamilyIndices = nullptr; // Optional
 		}
+
+		m_swapchain = vk::raii::SwapchainKHR(m_device, swapchainCreateInfo);
+		m_swapchainImages = m_swapchain.getImages();
 	}
 
 	// surface format (color depth)
