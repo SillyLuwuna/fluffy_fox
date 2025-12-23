@@ -52,6 +52,7 @@ namespace FluffyFox::Graphics
 		pickPhysicalDevice();
 		createLogicalDevice();
 		createSwapchain();
+		createImageViews();
 	}
 
 	void Engine::mainLoop()
@@ -470,5 +471,35 @@ namespace FluffyFox::Graphics
 			std::clamp<uint32_t>(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
 			std::clamp<uint32_t>(height, capabilities.minImageExtent.height, capabilities.minImageExtent.height)
 		};
+	}
+
+	void Engine::createImageViews()
+	{
+		m_swapchainImageViews.clear();
+
+		vk::ImageViewCreateInfo imageViewCreateInfo {
+			.viewType = vk::ImageViewType::e2D,
+			.format = m_swapchainSurfaceFormat.format,
+			.subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
+		};
+
+		// WARNING might be wrong? the tutorial used wrong constants
+		imageViewCreateInfo.components.r = vk::ComponentSwizzle::eIdentity;
+		imageViewCreateInfo.components.g = vk::ComponentSwizzle::eIdentity;
+		imageViewCreateInfo.components.b = vk::ComponentSwizzle::eIdentity;
+		imageViewCreateInfo.components.a = vk::ComponentSwizzle::eIdentity;
+
+		// WARNING might also be wrong?
+		imageViewCreateInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+		imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+		imageViewCreateInfo.subresourceRange.levelCount = 1;
+		imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+		imageViewCreateInfo.subresourceRange.layerCount = 1;
+
+		for (vk::Image& image : m_swapchainImages)
+		{
+			imageViewCreateInfo.image = image;
+			m_swapchainImageViews.emplace_back(m_device, imageViewCreateInfo);
+		}
 	}
 }

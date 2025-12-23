@@ -70,6 +70,7 @@ namespace FluffyFox::Graphics
 			vk::Extent2D m_swapchainExtent;
 			vk::raii::SwapchainKHR m_swapchain;
 			std::vector<vk::Image> m_swapchainImages;
+			std::vector<vk::raii::ImageView> m_swapchainImageViews;
 
 			// functions
 			static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -89,5 +90,6 @@ namespace FluffyFox::Graphics
 			vk::SurfaceFormatKHR chooseSwapchainSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats);
 			vk::PresentModeKHR chooseSwapchainPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes);
 			vk::Extent2D chooseSwapchainSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities);
+			void createImageViews();
 	};
 }
