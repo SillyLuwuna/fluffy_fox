@@ -53,6 +53,7 @@ namespace FluffyFox::Graphics
 		createLogicalDevice();
 		createSwapchain();
 		createImageViews();
+		createGraphicsPipeline();
 	}
 
 	void Engine::mainLoop()
@@ -501,5 +502,10 @@ namespace FluffyFox::Graphics
 			imageViewCreateInfo.image = image;
 			m_swapchainImageViews.emplace_back(m_device, imageViewCreateInfo);
 		}
+	}
+
+	void Engine::createGraphicsPipeline()
+	{
+
 	}
 }

@@ -7,7 +7,9 @@
 ## linear algebra library
 - glm
 ## shader compilation
-- shaderc
+- slang
+- slangc compiled from source
+<!-- - shaderc -->
 
 # possible glfw dependencies
 - libxi

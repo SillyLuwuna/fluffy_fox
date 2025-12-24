@@ -91,5 +91,6 @@ namespace FluffyFox::Graphics
 			vk::PresentModeKHR chooseSwapchainPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes);
 			vk::Extent2D chooseSwapchainSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities);
 			void createImageViews();
+			void createGraphicsPipeline();
 	};
 }

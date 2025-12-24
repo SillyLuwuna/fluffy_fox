@@ -20,13 +20,41 @@ set(CMAKE_BUILD_TYPE Debug)
 
 # list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/CMake")
 
-find_package (glfw3 REQUIRED)
-find_package (glm REQUIRED)
-find_package (Vulkan REQUIRED)
+find_package(glfw3 REQUIRED)
+find_package(glm REQUIRED)
+find_package(Vulkan REQUIRED)
 
 # set up Vulkan C++ module
 target_include_directories(${PROJECT_NAME} PRIVATE ${Vulkan_INCLUDE_DIR})
 target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan glfw)
+
+
+# set up shader compilation
+
+function (add_slang_shader_target TARGET)
+	cmake_parse_arguments("SHADER" "" "" "SOURCES" ${ARGN})
+	# set(SLANGC_EXECUTABLE ../programs/slang/bin/slangc)
+	set(SLANGC_EXECUTABLE slangc)
+	set(SHADERS_DIR ${CMAKE_CURRENT_LIST_DIR}/shaders)
+	set(ENTRY_POINTS -entry vertMain -entry fragMain)
+	file(GLOB SHADER_SOURCES "${SHADERS_DIR}/*.slang")
+	add_custom_command(
+		  OUTPUT ${SHADERS_DIR}
+		  COMMAND ${CMAKE_COMMAND} -E make_directory ${SHADERS_DIR}
+	)
+	add_custom_command(
+		  OUTPUT  ${SHADERS_DIR}/slang.spv
+		  COMMAND ${SLANGC_EXECUTABLE} ${SHADER_SOURCES} -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name ${ENTRY_POINTS} -o slang.spv
+		  WORKING_DIRECTORY ${SHADERS_DIR}
+		  DEPENDS ${SHADERS_DIR} ${SHADER_SOURCES}
+		  COMMENT "Compiling Slang Shaders"
+		  VERBATIM
+	)
+	add_custom_target(${TARGET} DEPENDS ${SHADERS_DIR}/slang.spv)
+endfunction()
+
+add_slang_shader_target(shaders SOURCES ${SHADER_SLANG_SOURCES})
+add_dependencies(${PROJECT_NAME} shaders)
 
 
 # add_library(VulkanCppModule)
