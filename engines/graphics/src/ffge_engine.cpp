@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <iostream>
+#include <fstream>
 #include <map>
 #include <set>
 #include <vector>
@@ -504,8 +505,60 @@ namespace FluffyFox::Graphics
 		}
 	}
 
+	std::vector<char> Engine::readFile(const std::string& filename)
+	{
+		// ate - start reading at the end of file
+		// binary - read file as binary
+		std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+		if (!file.is_open())
+		{
+			throw std::runtime_error("failed to open file!");
+		}
+
+		std::vector<char> buffer(file.tellg());
+
+		file.seekg(0, std::ios::beg);
+		file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+
+		file.close();
+
+		return buffer;
+	}
+
+	[[nodiscard]] vk::raii::ShaderModule Engine::createShaderModule(const std::vector<char>& code) const
+	{
+		vk::ShaderModuleCreateInfo shaderModuleCreateInfo {
+			.codeSize = code.size() * sizeof(char),
+			.pCode = reinterpret_cast<const uint32_t*>(code.data())
+		};
+
+		vk::raii::ShaderModule shaderModule{m_device, shaderModuleCreateInfo};
+
+		return shaderModule;
+	}
+
 	void Engine::createGraphicsPipeline()
 	{
+		std::vector<char> shaderCode = readFile("shaders/slang.spv");
+		vk::raii::ShaderModule shaderModule = createShaderModule(shaderCode);
 
+		vk::PipelineShaderStageCreateInfo vertShaderStageInfo{
+			.stage = vk::ShaderStageFlagBits::eVertex,
+			.module = shaderModule,
+			.pName = "vertMain",
+			.pSpecializationInfo = nullptr // actually really important to set constants to make the same thing do different things!
+											// very efficient and "ifs" checking for them will be optimized out
+		};
+
+		vk::PipelineShaderStageCreateInfo fragShaderStageInfo{
+			.stage = vk::ShaderStageFlagBits::eFragment,
+			.module = shaderModule,
+			.pName = "fragMain",
+			.pSpecializationInfo = nullptr // actually really important to set constants to make the same thing do different things!
+											// very efficient and "ifs" checking for them will be optimized out
+		};
+
+		vk::PipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
 	}
 }

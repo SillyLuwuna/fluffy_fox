@@ -75,6 +75,7 @@ namespace FluffyFox::Graphics
 			// functions
 			static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
 				vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT * pCallbackData, void*);
+			static std::vector<char> readFile(const std::string& filename);
 			void initWindow();
 			void initVulkan();
 			void mainLoop();
@@ -92,5 +93,6 @@ namespace FluffyFox::Graphics
 			vk::Extent2D chooseSwapchainSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities);
 			void createImageViews();
 			void createGraphicsPipeline();
+			[[nodiscard]] vk::raii::ShaderModule createShaderModule(const std::vector<char>& code) const;
 	};
 }
