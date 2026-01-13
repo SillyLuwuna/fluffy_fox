@@ -560,5 +560,49 @@ namespace FluffyFox::Graphics
 		};
 
 		vk::PipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+		// dynamic states
+		std::vector dynamicStates = { // what will be able to change dynamically, not static
+			vk::DynamicState::eViewport,
+			vk::DynamicState::eScissor
+		};
+
+		vk::PipelineDynamicStateCreateInfo dynamicState{
+			.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
+			.pDynamicStates = dynamicStates.data()
+		};
+
+		// vertex data
+		vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
+
+		// input assembly
+		vk::PipelineInputAssemblyStateCreateInfo{
+			.topology = vk::PrimitiveTopology::eTriangleList,
+			.primitiveRestartEnable = VK_FALSE
+		};
+
+		// viewports (define transformation from image to framebuffer) and scissors (region where pixels will be stored)
+		// vk::Viewport viewport = vk::Viewport{
+		// 	0.0f,
+		// 	0.0f,
+		// 	static_cast<float>(m_swapchainExtent.width),
+		// 	static_cast<float>(m_swapchainExtent.height),
+		// 	0.0f,
+		// 	1.0f
+		// };
+		//
+		// vk::Rect2D scissorRectangle = vk::Rect2D{
+		// 	vk::Offset2D{0, 0},
+		// 	m_swapchainExtent
+		// };
+		
+
+		// viewport and scissors are initialized because they are dynamic and initialized later
+		vk::PipelineViewportStateCreateInfo viewportState{
+			.viewportCount = 1,
+			.pViewports = {},
+			.scissorCount = 1,
+			.pScissors = {}
+		};
 	}
 }
