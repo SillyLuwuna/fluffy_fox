@@ -1,3 +1,4 @@
+#pragma once
 #include "util/named_function.hpp"
 
 using namespace util;
@@ -21,7 +22,7 @@ template<typename... Args>
 typename std::result_of<std::function<T>(Args...)>::type
 NamedFunction<T>::operator()(Args&&... args)
 {
-	return func(std::forward<Args>(args)...);
+	return m_func(std::forward<Args>(args)...);
 }
 
 template<typename T>
@@ -33,5 +34,5 @@ bool NamedFunction<T>::operator==(const NamedFunction& other) const
 template<typename T>
 std::size_t NamedFunctionHash::operator()(const NamedFunction<T>& func) const
 {
-	return std::hash<std::string>{}(func.getName());
+	return std::hash<std::string>{}(func.get_name());
 }

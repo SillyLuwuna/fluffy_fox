@@ -8,8 +8,8 @@ namespace util
 	class NamedFunction
 	{
 		private:
-			const std::function<T> m_func;
-			const std::string m_name;
+			std::function<T> m_func;
+			std::string m_name;
 
 		public:
 			NamedFunction(const std::function<T>& func, const std::string& name);
@@ -29,3 +29,4 @@ namespace util
 	};
 }
 
+#include "named_function.ipp"

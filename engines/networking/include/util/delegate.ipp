@@ -1,3 +1,4 @@
+#pragma once
 #include "util/delegate.hpp"
 
 using namespace util;
@@ -14,6 +15,11 @@ Delegate<RetType, ArgType>::Delegate() :
 template<typename RetType, typename ArgType>
 void Delegate<RetType, ArgType>::subscribe(NamedFunction<RetType(ArgType)> fun)
 {
+	if (m_subscribers.contains(fun))
+	{
+		return;
+	}
+
 	m_subscribers.emplace(fun);
 	m_subscribers_lazy.emplace_back(fun);
 }
@@ -21,7 +27,16 @@ void Delegate<RetType, ArgType>::subscribe(NamedFunction<RetType(ArgType)> fun)
 template<typename RetType, typename ArgType>
 void Delegate<RetType, ArgType>::unsubscribe(NamedFunction<RetType(ArgType)> fun)
 {
+	if (!m_subscribers.contains(fun))
+	{
+		return;
+	}
+
 	m_subscribers.erase(fun);
+	m_num_deletions++;
+
+	clean();
+	// clean_if_necessary();
 }
 
 template<typename RetType, typename ArgType>
@@ -68,16 +83,13 @@ void Delegate<RetType, ArgType>::invoke(ArgType arg)
 }
 
 template<typename RetType, typename ArgType>
-Delegate<RetType, ArgType>& Delegate<RetType, ArgType>::operator+=(const NamedFunction<RetType(ArgType)> other)
+Delegate<RetType, ArgType>& Delegate<RetType, ArgType>::operator+=(NamedFunction<RetType(ArgType)> other)
 {
 	subscribe(other);
 }
 
 template<typename RetType, typename ArgType>
-Delegate<RetType, ArgType>& Delegate<RetType, ArgType>::operator-=(const NamedFunction<RetType(ArgType)> other)
+Delegate<RetType, ArgType>& Delegate<RetType, ArgType>::operator-=(NamedFunction<RetType(ArgType)> other)
 {
 	unsubscribe(other);
-	m_num_deletions++;
-
-	clean_if_necessary();
 }

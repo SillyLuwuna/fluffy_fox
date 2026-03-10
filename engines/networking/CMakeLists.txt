@@ -12,12 +12,12 @@ project(networking) # project
 # add_subdirectory(library_name)
 
 file(GLOB_RECURSE SRC_FILES src/*.cpp) # recursively finds .cpp files in src and saves them to variable SRC_FILES
-add_executable(networking ${SRC_FILES}) # adds all the .cpp files to be compiled
+file(GLOB_RECURSE HEADER_FILES include/*.hpp)
+file(GLOB_RECURSE IMPLEMENTATION_FILES include/*.ipp)
+add_executable(networking ${SRC_FILES} ${HEADER_FILES} ${IMPLEMENTATION_FILES}) # adds all the .cpp files to be compiled
 
 
 target_include_directories(networking PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include) # includes
-
-
 
 
 # testing
