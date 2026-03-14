@@ -1,1 +1,0 @@
-/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/networking.dir/link.d CMakeFiles/networking.dir/src/main.cpp.o -o networking

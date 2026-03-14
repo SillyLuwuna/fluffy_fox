@@ -1,1 +1,0 @@
-/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/tests.dir/link.d CMakeFiles/tests.dir/test/util/delegate_test.cpp.o CMakeFiles/tests.dir/test/util/named_function_test.cpp.o -o tests
