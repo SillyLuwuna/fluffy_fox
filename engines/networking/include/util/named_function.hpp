@@ -17,7 +17,7 @@ namespace util
 
 			template<typename... Args>
 			typename std::result_of<std::function<T>(Args...)>::type
-			operator()(Args&&... args);
+			operator()(Args&&... args) const;
 
 			bool operator==(const NamedFunction& other) const;
 	};

@@ -1,5 +1,5 @@
 #include "doctest.hpp"
-#include "util/delegate.hpp"
+#include "util/event.hpp"
 
 void succ(int* i_ptr)
 {
@@ -8,12 +8,17 @@ void succ(int* i_ptr)
 
 void double_val(int* i_ptr)
 {
-	*i_ptr *= (*i_ptr);
+	*i_ptr *= 2;
 }
 
 void add_5(int* i_ptr)
 {
 	*i_ptr += 5;
+}
+
+void add_numbers(int a, int b, int* out)
+{
+	*out = a + b;
 }
 
 TEST_CASE("should call function")
@@ -23,7 +28,7 @@ TEST_CASE("should call function")
 	NamedFunction<void(int*)> nf1(succ, "f1");
 	NamedFunction<void(int*)> nf2(succ, "f2");
 
-	Delegate<int*> event;
+	Event<int*> event;
 
 	event.subscribe(nf0);
 	event.subscribe(nf1);
@@ -41,7 +46,7 @@ TEST_CASE("should call function")
 TEST_CASE("should not throw when empty")
 {
 	// Arrange
-	Delegate<int*> event;
+	Event<int*> event;
 	bool exception_ocurred = false;
 
 	// Act
@@ -66,7 +71,7 @@ TEST_CASE("should unsubscribe")
 	NamedFunction<void(int*)> nf1(succ, "f1");
 	NamedFunction<void(int*)> nf2(succ, "f2");
 
-	Delegate<int*> event;
+	Event<int*> event;
 
 	event.subscribe(nf0);
 	event.subscribe(nf1);
@@ -89,7 +94,7 @@ TEST_CASE("should resubscribe correctly")
 	NamedFunction<void(int*)> nf1(succ, "f1");
 	NamedFunction<void(int*)> nf2(succ, "f2");
 
-	Delegate<int*> event;
+	Event<int*> event;
 
 	event.subscribe(nf0);
 	event.subscribe(nf1);
@@ -112,7 +117,7 @@ TEST_CASE("should not throw when unsubscribing nonexistant function")
 	NamedFunction<void(int*)> nf0(succ, "f0");
 	NamedFunction<void(int*)> nf1(succ, "f1");
 
-	Delegate<int*> event;
+	Event<int*> event;
 	event.subscribe(nf0);
 
 	bool exception_ocurred = false;
@@ -139,7 +144,7 @@ TEST_CASE("should not oversubscribe when subscribing existing function")
 	// Arrange
 	NamedFunction<void(int*)> nf0(succ, "f0");
 
-	Delegate<int*> event;
+	Event<int*> event;
 	event.subscribe(nf0);
 
 	bool exception_ocurred = false;
@@ -163,5 +168,42 @@ TEST_CASE("should not oversubscribe when subscribing existing function")
 
 TEST_CASE("should work with different functions")
 {
+	// Arrange
+	NamedFunction<void(int*)> nsucc(succ, "f0");
+	NamedFunction<void(int*)> ndouble_val(double_val, "f1");
+	NamedFunction<void(int*)> nadd_5(add_5, "f2");
 
+	Event<int*> event;
+
+	event.subscribe(nsucc);
+	event.subscribe(ndouble_val);
+	event.subscribe(nadd_5);
+
+	int i0 = 4;
+
+	// Act
+	event.invoke(&i0);
+
+	// Assert
+	CHECK(i0 == 15);
+}
+
+TEST_CASE("should work with several arguments")
+{
+	// Arrange
+	NamedFunction<void(int,int,int*)> nadd_numbers(add_numbers, "f0");
+
+	Event<int,int,int*> event;
+
+	event.subscribe(nadd_numbers);
+
+	int i0 = 4;
+	int i1 = 6;
+	int i2 = 0;
+
+	// Act
+	event.invoke(i0, i1, &i2);
+
+	// Assert
+	CHECK(i2 == 10);
 }

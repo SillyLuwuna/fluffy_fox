@@ -20,7 +20,7 @@ const std::string& NamedFunction<T>::get_name() const
 template<typename T>
 template<typename... Args>
 typename std::result_of<std::function<T>(Args...)>::type
-NamedFunction<T>::operator()(Args&&... args)
+NamedFunction<T>::operator()(Args&&... args) const
 {
 	return m_func(std::forward<Args>(args)...);
 }

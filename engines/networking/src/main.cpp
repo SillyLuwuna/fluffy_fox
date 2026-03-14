@@ -1,6 +1,6 @@
 #include <iostream>
 #include "util/named_function.hpp"
-#include "util/delegate.hpp"
+#include "util/event.hpp"
 
 using namespace util;
 
@@ -21,11 +21,11 @@ void f2(int arg)
 
 int main(int argc, char **argv)
 {
-	NamedFunction<void(int)> nf0(f0, "f0");
+	const NamedFunction<void(int)> nf0(f0, "f0");
 	NamedFunction<void(int)> nf1(f1, "f1");
 	NamedFunction<void(int)> nf2(f2, "f2");
 
-	Delegate<int> event;
+	Event<int> event;
 
 	event.subscribe(nf0);
 	event.subscribe(nf1);
