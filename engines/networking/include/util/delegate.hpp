@@ -6,26 +6,26 @@
 
 namespace util
 {
-	template<typename RetType, typename ArgType>
+	template<typename ArgType>
 	class Delegate
 	{
 		private:
-			std::unordered_set<NamedFunction<RetType(ArgType)>, NamedFunctionHash> m_subscribers;
-			std::vector<NamedFunction<RetType(ArgType)>> m_subscribers_lazy;
+			std::unordered_set<NamedFunction<void(ArgType)>, NamedFunctionHash> m_subscribers;
+			std::vector<NamedFunction<void(ArgType)>> m_subscribers_lazy;
 			uint16_t m_num_deletions;
-
-		public:
-			Delegate();
-
-			void subscribe(NamedFunction<RetType(ArgType)> fun);
-			void unsubscribe(NamedFunction<RetType(ArgType)> fun);
-			void invoke(ArgType arg);
 
 			void clean();
 			void clean_if_necessary();
 
-			Delegate& operator+=(NamedFunction<RetType(ArgType)> other);
-			Delegate& operator-=(NamedFunction<RetType(ArgType)> other);
+		public:
+			Delegate();
+
+			void subscribe(NamedFunction<void(ArgType)> fun);
+			void unsubscribe(NamedFunction<void(ArgType)> fun);
+			void invoke(ArgType arg);
+
+			Delegate& operator+=(NamedFunction<void(ArgType)> other);
+			Delegate& operator-=(NamedFunction<void(ArgType)> other);
 	};
 }
 

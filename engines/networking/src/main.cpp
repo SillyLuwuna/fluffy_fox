@@ -4,31 +4,28 @@
 
 using namespace util;
 
-bool f0(int arg)
+void f0(int arg)
 {
 	std::cout << "[0] hewwo I am " << arg << "\n";
-	return true;
 }
 
-bool f1(int arg)
+void f1(int arg)
 {
 	std::cout << "[1] hewwo I am " << arg << "\n";
-	return true;
 }
 
-bool f2(int arg)
+void f2(int arg)
 {
 	std::cout << "[2] hewwo I am " << arg << "\n";
-	return true;
 }
 
 int main(int argc, char **argv)
 {
-	NamedFunction<bool(int)> nf0(f0, "f0");
-	NamedFunction<bool(int)> nf1(f1, "f1");
-	NamedFunction<bool(int)> nf2(f2, "f2");
+	NamedFunction<void(int)> nf0(f0, "f0");
+	NamedFunction<void(int)> nf1(f1, "f1");
+	NamedFunction<void(int)> nf2(f2, "f2");
 
-	Delegate<bool, int> event;
+	Delegate<int> event;
 
 	event.subscribe(nf0);
 	event.subscribe(nf1);

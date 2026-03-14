@@ -3,8 +3,8 @@
 
 using namespace util;
 
-template<typename RetType, typename ArgType>
-Delegate<RetType, ArgType>::Delegate() :
+template<typename ArgType>
+Delegate<ArgType>::Delegate() :
 	m_subscribers(),
 	m_subscribers_lazy(),
 	m_num_deletions(0)
@@ -12,8 +12,8 @@ Delegate<RetType, ArgType>::Delegate() :
 
 }
 
-template<typename RetType, typename ArgType>
-void Delegate<RetType, ArgType>::subscribe(NamedFunction<RetType(ArgType)> fun)
+template<typename ArgType>
+void Delegate<ArgType>::subscribe(NamedFunction<void(ArgType)> fun)
 {
 	if (m_subscribers.contains(fun))
 	{
@@ -24,8 +24,8 @@ void Delegate<RetType, ArgType>::subscribe(NamedFunction<RetType(ArgType)> fun)
 	m_subscribers_lazy.emplace_back(fun);
 }
 
-template<typename RetType, typename ArgType>
-void Delegate<RetType, ArgType>::unsubscribe(NamedFunction<RetType(ArgType)> fun)
+template<typename ArgType>
+void Delegate<ArgType>::unsubscribe(NamedFunction<void(ArgType)> fun)
 {
 	if (!m_subscribers.contains(fun))
 	{
@@ -39,15 +39,15 @@ void Delegate<RetType, ArgType>::unsubscribe(NamedFunction<RetType(ArgType)> fun
 	// clean_if_necessary();
 }
 
-template<typename RetType, typename ArgType>
-void Delegate<RetType, ArgType>::clean()
+template<typename ArgType>
+void Delegate<ArgType>::clean()
 {
-	std::vector<NamedFunction<RetType(ArgType)>> new_vect;
+	std::vector<NamedFunction<void(ArgType)>> new_vect;
 	new_vect.reserve(m_subscribers_lazy.size());
 
 	for(int i = 0; i < m_subscribers_lazy.size(); i++)
 	{
-		NamedFunction<RetType(ArgType)> curr_subscriber = m_subscribers_lazy[i];
+		NamedFunction<void(ArgType)> curr_subscriber = m_subscribers_lazy[i];
 		if (m_subscribers.contains(curr_subscriber))
 		{
 			new_vect.emplace_back(curr_subscriber);
@@ -58,8 +58,8 @@ void Delegate<RetType, ArgType>::clean()
 	m_num_deletions = 0;
 }
 
-template<typename RetType, typename ArgType>
-void Delegate<RetType, ArgType>::clean_if_necessary()
+template<typename ArgType>
+void Delegate<ArgType>::clean_if_necessary()
 {
 	float ratio = m_num_deletions / m_subscribers_lazy.size();
 	if (ratio >= 0.5)
@@ -68,12 +68,12 @@ void Delegate<RetType, ArgType>::clean_if_necessary()
 	}
 }
 
-template<typename RetType, typename ArgType>
-void Delegate<RetType, ArgType>::invoke(ArgType arg)
+template<typename ArgType>
+void Delegate<ArgType>::invoke(ArgType arg)
 {
 	for(int i = 0; i < m_subscribers_lazy.size(); i++)
 	{
-		NamedFunction<RetType(ArgType)> curr_subscriber = m_subscribers_lazy[i];
+		NamedFunction<void(ArgType)> curr_subscriber = m_subscribers_lazy[i];
 		if (!m_subscribers.contains(curr_subscriber))
 		{
 			continue;
@@ -82,14 +82,14 @@ void Delegate<RetType, ArgType>::invoke(ArgType arg)
 	}
 }
 
-template<typename RetType, typename ArgType>
-Delegate<RetType, ArgType>& Delegate<RetType, ArgType>::operator+=(NamedFunction<RetType(ArgType)> other)
+template<typename ArgType>
+Delegate<ArgType>& Delegate<ArgType>::operator+=(NamedFunction<void(ArgType)> other)
 {
 	subscribe(other);
 }
 
-template<typename RetType, typename ArgType>
-Delegate<RetType, ArgType>& Delegate<RetType, ArgType>::operator-=(NamedFunction<RetType(ArgType)> other)
+template<typename ArgType>
+Delegate<ArgType>& Delegate<ArgType>::operator-=(NamedFunction<void(ArgType)> other)
 {
 	unsubscribe(other);
 }
