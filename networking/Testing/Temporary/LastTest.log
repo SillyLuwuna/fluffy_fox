@@ -1,0 +1,19 @@
+Start testing: Mar 13 23:54 WET
+----------------------------------------------------------
+Unable to find executable: /home/luna/Documents/code/fluffy_fox_project/engines/networking/tests
+1/1 Testing: AllTests
+1/1 Test: AllTests
+Command: ""
+Directory: /home/luna/Documents/code/fluffy_fox_project/engines/networking
+"AllTests" start time: 
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"AllTests" end time: Mar 13 23:54 WET
+"AllTests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Mar 13 23:54 WET
