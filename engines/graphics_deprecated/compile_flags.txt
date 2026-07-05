@@ -1,5 +1,0 @@
--Wall
--Wextra
--Wpedantic
--I
-include

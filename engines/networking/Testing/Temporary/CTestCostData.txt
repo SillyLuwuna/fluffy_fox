@@ -1,3 +1,0 @@
-AllTests 0 0
----
-AllTests
