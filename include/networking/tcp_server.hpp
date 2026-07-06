@@ -1,11 +1,11 @@
 #pragma once
 #include <cstdint>
-#include <string>
 #include "event2/event.h"
 #include "event2/listener.h"
 #include "event2/bufferevent.h"
 #include "event2/buffer.h"
 #include "events/event.hpp"
+#include "networking/client_data.hpp"
 
 namespace fluffy_fox::networking
 {
@@ -14,15 +14,18 @@ namespace fluffy_fox::networking
 	{
 	private:
 		uint16_t max_connections_;
-		uint8_t port_;
+		uint16_t port_;
 
-		Event<struct bufferevent*> on_connect;
-		Event<struct bufferevent*> on_disconnect;
-		Event<struct bufferevent*, const std::string&> on_data_received;
+		Event<const ClientData&> connection_event_;
+		Event<const ClientData&> disconnection_event_;
+		Event<const ClientData&, const std::vector<uint8_t>&> data_received_event_;
 
 		event_base* base_;
 		evconnlistener* listener_;
-		std::unordered_set<bufferevent*> connections_;
+		std::unordered_map<int, ClientData> connections_;
+		// std::unordered_set<ClientData> connections_;
+		// std::unordered_set<bufferevent*> connections_;
+		bool running_;
 
 		static void on_accept(evconnlistener* listener, evutil_socket_t fd, sockaddr* address, int socklen, void* ctx);
 		static void on_read(bufferevent* buffer, void* ctx);
@@ -34,28 +37,14 @@ namespace fluffy_fox::networking
 		TcpServer& operator=(const TcpServer&) = delete;
 		TcpServer& operator=(TcpServer&&) = delete;
 
-		TcpServer(uint16_t max_connections, uint8_t port);
+		TcpServer(uint16_t max_connections, uint16_t port); // TODO max_connections actually works
 		~TcpServer();
 
 		bool start();
 		void stop();
 
-
-		uint8_t port(int i) const;
-		// bool is_listening() const;
-		// bool is_receiving_connections() const;
-
-		// void start_listening();
-		// void stop_listening();
-		// void start_receiving_connections();
-		// void stop_receiving_connections();
-		// void send_data(const std::string& ip, const std::string& data); // FIXME should be ip class
-		// void disconnect(const std::string& ip); // FIXME should be ip class
-		// void connect(const std::string& ip, u_int16_t attempts); // FIXME should be ip class
-
-		// void subscribe_data_received(const MemberFunction<void(const std::string&, const std::string&)>&& callback); // FIXME should be ip class
-		// void subscribe_data_sent(const MemberFunction<void(const std::string&, const std::string&)>&& callback); // FIXME should be ip class
-		// void subscribe_connection(const MemberFunction<void(const std::string&)>&& callback); // FIXME should be ip class
-		// void subscribe_disconnection(const MemberFunction<void(const std::string&)>&& callback); // FIXME should be ip class
+		Event<const ClientData&>& connection_event();
+		Event<const ClientData&>& disconnection_event();
+		Event<const ClientData&, const std::vector<uint8_t>&>& data_received_event();
 	};
 }

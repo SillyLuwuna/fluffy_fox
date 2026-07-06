@@ -10,12 +10,24 @@ project(networking)
 
 add_executable(networking ${SRC_FILES})
 
+target_compile_options(networking PRIVATE
+	-Wall
+	-Wextra
+	-Wpedantic
+	-O2
+)
+
+target_link_options(networking PRIVATE
+)
+
 add_subdirectory(lib/libevent)
 target_link_libraries(networking
 	PRIVATE
 	event
 	event_core
 	event_extra
+	event_pthreads
+	pthread
 )
 
 target_include_directories(networking PUBLIC include lib/doctest)

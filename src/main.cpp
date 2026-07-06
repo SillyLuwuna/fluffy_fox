@@ -1,44 +1,55 @@
 #include "events/event.hpp"
+#include "networking/tcp_client.hpp"
+#include "networking/tcp_server.hpp"
 #include <iostream>
+#include <thread>
 
 using namespace fluffy_fox;
+using namespace fluffy_fox::networking;
 
-class TestClass
+void on_message_received(const ClientData& client, const std::vector<uint8_t>& data)
 {
-private:
-	Event<int>& m_event;
-	int m_first;
-
-	void print_int(int i)
-	{
-		std::cout << "number " << (m_first++ + i) << "!\n";
-	}
-
-public:
-	TestClass(int first, Event<int>& event) :
-		m_event(event),
-		m_first(first)
-	{
-		m_event.subscribe(&TestClass::print_int, this);
-	}
-
-	void leave()
-	{
-		m_event.unsubscribe(&TestClass::print_int, this);
-	}
-};
+	std::string_view str((const char*)data.data(), data.size());
+	std::cout << "[" << client.ip << ":" << client.port << "] " << str << std::endl;
+}
 
 int main(int argc, char **argv)
 {
-	Event<int> event;
+	if (argc < 2)
+	{
+		std::cerr << "usage: " << argv[0] << " [server|client]" << std::endl;
+		return 1;
+	}
 
-	TestClass t0 = TestClass(5, event);
-	TestClass t1 = TestClass(8, event);
-	TestClass t2 = TestClass(8, event);
+	std::string_view type = argv[1];
+	if (type == "server")
+	{
+		TcpServer server(1, 13774);
+		server.data_received_event() += on_message_received;
+		server.start();
+	}
+	else if (type == "client")
+	{
+		TcpClient client;
+		std::jthread t(&TcpClient::connect, &client, "localhost", 13774);
 
-	event.invoke(6);
-	t0.leave();
-	event.invoke(6);
+		std::string message;
+		std::getline(std::cin, message);
+		while (message != "")
+		{
+			client.send_data((uint8_t*)message.data(), message.length());
+			std::getline(std::cin, message);
+		}
+
+		client.disconnect();
+	}
+	else
+	{
+		std::cerr << "unknown type \"" << type << "\"\n";
+		std::cerr << "usage: " << argv[0] << " [server|client]" << std::endl;
+		return 1;
+	}
+
 
 	return 0;
 }

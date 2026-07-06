@@ -5,13 +5,20 @@
 #include <iostream>
 #include <stdexcept>
 
-using fluffy_fox::networking::TcpServer;
+using namespace fluffy_fox;
+using namespace fluffy_fox::networking;
 
-TcpServer::TcpServer(uint16_t max_connections, uint8_t port) :
+TcpServer::TcpServer(uint16_t max_connections, uint16_t port) :
 	max_connections_(max_connections),
 	port_(port),
-	base_(nullptr)
+	connection_event_(),
+	disconnection_event_(),
+	data_received_event_(),
+	base_(nullptr),
+	connections_(),
+	running_(false)
 {
+	connections_.reserve(max_connections);
 	base_ = event_base_new();
 	if (!base_)
 	{
@@ -47,8 +54,15 @@ bool TcpServer::start()
 	std::cout << "server listening on port " << port_ << "\n";
 
 	// TODO blocks
-	bool success = event_base_dispatch(base_);
-	if (!success) return false;
+	running_ = true;
+	int success = event_base_dispatch(base_);
+	if (success < 0)
+	{
+		running_ = false;
+		evconnlistener_free(listener_);
+		std::cerr << "error dispatching\n";
+		return false;
+	}
 
 	return true;
 }
@@ -63,14 +77,17 @@ void TcpServer::stop()
 		listener_ = nullptr;
 	}
 
-	for (bufferevent* buffer : connections_)
+	for (auto& [fd, client] : connections_)
 	{
-		bufferevent_free(buffer);
+		bufferevent_free(client.buffer_event);
+		client.buffer_event = nullptr;
 	}
 	connections_.clear();
+
+	running_ = false;
 }
 
-void TcpServer::on_accept(evconnlistener* listener, evutil_socket_t fd, sockaddr* address, int socklen, void* ctx)
+void TcpServer::on_accept(evconnlistener* listener, evutil_socket_t fd, sockaddr* address, int , void* ctx)
 {
 	TcpServer* server = static_cast<TcpServer*>(ctx);
 	event_base* base = evconnlistener_get_base(listener);
@@ -83,38 +100,42 @@ void TcpServer::on_accept(evconnlistener* listener, evutil_socket_t fd, sockaddr
 		return;
 	}
 
-	server->connections_.insert(buffer);
+	char ip[INET_ADDRSTRLEN];
+	sockaddr_in* sin = (sockaddr_in*)address;
+	inet_ntop(AF_INET, &sin->sin_addr, ip, sizeof(ip));
+	uint16_t port = ntohs(sin->sin_port);
+
+	ClientData client(ip, port, buffer);
+	server->connections_.emplace(client.fd, client);
 
 	bufferevent_setcb(buffer, on_read, nullptr, on_event, server);
 	bufferevent_enable(buffer, EV_READ | EV_WRITE);
 
-	char ip[INET_ADDRSTRLEN];
-	sockaddr_in* sin = (sockaddr_in*)address;
-	inet_ntop(AF_INET, &sin->sin_addr, ip, sizeof(ip));
-	std::cout << "client connected " << ip << ":" << ntohs(sin->sin_port) << "\n";
+	std::cout << "client connected " << ip << ":" << port << "\n";
 
-	server->on_connect.invoke(buffer);
+	server->connection_event_.invoke(client);
 }
 
-void TcpServer::on_read(bufferevent* buffer, void* ctx)
+void TcpServer::on_read(bufferevent* buffer_event, void* ctx)
 {
 	TcpServer* server = static_cast<TcpServer*>(ctx);
-	evbuffer* input = bufferevent_get_input(buffer);
+	evbuffer* input = bufferevent_get_input(buffer_event);
+	int fd = bufferevent_getfd(buffer_event);
 
-	char *line;
-	size_t n;
-	while ((line = evbuffer_readln(input, &n, EVBUFFER_EOL_ANY)))
-	{
-		std::string message(line);
-		free(line);
+	size_t len = evbuffer_get_length(input);
+	if (len == 0) return;
 
-		server->on_data_received.invoke(buffer, message);
-	}
+	std::vector<uint8_t> data(len);
+	evbuffer_remove(input, data.data(), len);
+
+	const ClientData& client = server->connections_.at(fd);
+	server->data_received_event_.invoke(client, data);
 }
 
-void TcpServer::on_event(bufferevent* buffer, short events, void* ctx)
+void TcpServer::on_event(bufferevent* buffer_event, short events, void* ctx)
 {
 	TcpServer* server = static_cast<TcpServer*>(ctx);
+	int fd = bufferevent_getfd(buffer_event);
 
 	if (events & BEV_EVENT_ERROR)
 	{
@@ -123,8 +144,24 @@ void TcpServer::on_event(bufferevent* buffer, short events, void* ctx)
 
 	if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR))
 	{
-		server->on_disconnect.invoke(buffer);
-		server->connections_.erase(buffer);
+		const ClientData& client = server->connections_.at(fd);
+		server->disconnection_event_.invoke(client);
+		server->connections_.erase(fd);
 		std::cout << "client disconnected\n";
 	}
+}
+
+Event<const ClientData&>& TcpServer::connection_event()
+{
+	return connection_event_;
+}
+
+Event<const ClientData&>& TcpServer::disconnection_event()
+{
+	return disconnection_event_;
+}
+
+Event<const ClientData&, const std::vector<uint8_t>&>& TcpServer::data_received_event()
+{
+	return data_received_event_;
 }

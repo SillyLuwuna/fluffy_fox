@@ -1,7 +1,6 @@
 #pragma once
 
 #include "events/member_function.hpp"
-#include <cstdint>
 #include <unordered_set>
 
 namespace fluffy_fox
@@ -33,6 +32,16 @@ namespace fluffy_fox
 			unsubscribe(EventFunction<Args...>(member_func, obj));
 		}
 
+		void subscribe(std::function<void(Args...)>&& func)
+		{
+			subscribers_.emplace(func);
+		}
+
+		void unsubscribe(std::function<void(Args...)>&& func)
+		{
+			unsubscribe(EventFunction<Args...>(func));
+		}
+
 		void subscribe(EventFunction<Args...>&& fun)
 		{
 			subscribers_.emplace(fun);
@@ -48,7 +57,7 @@ namespace fluffy_fox
 		{
 			for (const EventFunction<Args...>& func : subscribers_)
 			{
-				func(std::forward<Args...>(arg...));
+				func(std::forward<Args>(arg)...);
 			}
 		}
 
@@ -58,6 +67,16 @@ namespace fluffy_fox
 		}
 
 		void operator-=(EventFunction<Args...>&& other)
+		{
+			unsubscribe(std::move(other));
+		}
+
+		void operator+=(std::function<void(Args...)>&& other)
+		{
+			subscribe(std::move(other));
+		}
+
+		void operator-=(std::function<void(Args...)>&& other)
 		{
 			unsubscribe(std::move(other));
 		}

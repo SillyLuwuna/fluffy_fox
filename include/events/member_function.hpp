@@ -26,6 +26,13 @@ namespace fluffy_fox
 			{
 			}
 
+			// TODO this isn't a "MemberFunction"
+			MemberFunction(std::function<T(Args...)> func) :
+				func_(func),
+				obj_(0)
+			{
+			}
+
 			T operator()(Args&&... args) const
 			{
 				return func_(std::forward<Args>(args)...);
