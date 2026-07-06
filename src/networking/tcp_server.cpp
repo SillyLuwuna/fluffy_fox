@@ -1,4 +1,5 @@
 #include "networking/tcp_server.hpp"
+#include "event2/thread.h"
 #include <arpa/inet.h>
 #include <cstdint>
 #include <cstring>
@@ -15,10 +16,16 @@ TcpServer::TcpServer(uint16_t max_connections, uint16_t port) :
 	disconnection_event_(),
 	data_received_event_(),
 	base_(nullptr),
-	connections_(),
-	running_(false)
+	listener_(nullptr),
+	clients_(),
+	is_connecting_or_disconnecting_mutex_(),
+	clients_mutex_(),
+	events_mutex_(),
+	running_(false),
+	event_thread_()
 {
-	connections_.reserve(max_connections);
+	evthread_use_pthreads();
+	clients_.reserve(max_connections);
 	base_ = event_base_new();
 	if (!base_)
 	{
@@ -37,6 +44,10 @@ TcpServer::~TcpServer()
 
 bool TcpServer::start()
 {
+	std::lock_guard lock(is_connecting_or_disconnecting_mutex_);
+
+	if (running_.load()) return true;
+
 	sockaddr_in sin;
 	std::memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
@@ -53,23 +64,24 @@ bool TcpServer::start()
 
 	std::cout << "server listening on port " << port_ << "\n";
 
-	// TODO blocks
-	running_ = true;
-	int success = event_base_dispatch(base_);
-	if (success < 0)
-	{
-		running_ = false;
-		evconnlistener_free(listener_);
-		std::cerr << "error dispatching\n";
-		return false;
-	}
+	running_.store(true);
+	event_thread_ = std::jthread(&TcpServer::run, this);
 
 	return true;
 }
 
 void TcpServer::stop()
 {
+	std::lock_guard lock(is_connecting_or_disconnecting_mutex_);
+
+	if (!running_.exchange(false)) return;
+
 	event_base_loopbreak(base_);
+
+	if (event_thread_.joinable())
+	{
+		event_thread_.join();
+	}
 
 	if (listener_)
 	{
@@ -77,20 +89,42 @@ void TcpServer::stop()
 		listener_ = nullptr;
 	}
 
-	for (auto& [fd, client] : connections_)
+	std::lock_guard client_lock(clients_mutex_);
+	for (auto& [fd, client] : clients_)
 	{
 		bufferevent_free(client.buffer_event);
 		client.buffer_event = nullptr;
 	}
-	connections_.clear();
+	clients_.clear();
+}
 
-	running_ = false;
+void TcpServer::run()
+{
+	int success = event_base_dispatch(base_);
+	if (success < 0)
+	{
+		std::cerr << "error on stopping event loop\n";
+	}
+	else if (success > 0)
+	{
+		std::cerr << "out of events in loop\n";
+	}
 }
 
 void TcpServer::on_accept(evconnlistener* listener, evutil_socket_t fd, sockaddr* address, int , void* ctx)
 {
 	TcpServer* server = static_cast<TcpServer*>(ctx);
 	event_base* base = evconnlistener_get_base(listener);
+
+	if (!server->running_.load()) return;
+
+	std::lock_guard client_lock(server->clients_mutex_);
+	if (server->clients_.size() >= server->max_connections_)
+	{
+		std::cout << "max connections reached! denying connection\n";
+		evutil_closesocket(fd);
+		return;
+	}
 
 	bufferevent* buffer = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE); // TODO "do not rely on bufferevent"?
 	if (!buffer)
@@ -106,14 +140,17 @@ void TcpServer::on_accept(evconnlistener* listener, evutil_socket_t fd, sockaddr
 	uint16_t port = ntohs(sin->sin_port);
 
 	ClientData client(ip, port, buffer);
-	server->connections_.emplace(client.fd, client);
+	server->clients_.emplace(client.fd, client);
 
 	bufferevent_setcb(buffer, on_read, nullptr, on_event, server);
 	bufferevent_enable(buffer, EV_READ | EV_WRITE);
 
 	std::cout << "client connected " << ip << ":" << port << "\n";
 
-	server->connection_event_.invoke(client);
+	{
+		std::lock_guard event_lock(server->events_mutex_);
+		server->connection_event_.invoke(client);
+	}
 }
 
 void TcpServer::on_read(bufferevent* buffer_event, void* ctx)
@@ -128,8 +165,13 @@ void TcpServer::on_read(bufferevent* buffer_event, void* ctx)
 	std::vector<uint8_t> data(len);
 	evbuffer_remove(input, data.data(), len);
 
-	const ClientData& client = server->connections_.at(fd);
-	server->data_received_event_.invoke(client, data);
+	std::lock_guard client_lock(server->clients_mutex_);
+	const ClientData& client = server->clients_.at(fd);
+
+	{
+		std::lock_guard event_lock(server->events_mutex_);
+		server->data_received_event_.invoke(client, data);
+	}
 }
 
 void TcpServer::on_event(bufferevent* buffer_event, short events, void* ctx)
@@ -144,9 +186,17 @@ void TcpServer::on_event(bufferevent* buffer_event, short events, void* ctx)
 
 	if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR))
 	{
-		const ClientData& client = server->connections_.at(fd);
-		server->disconnection_event_.invoke(client);
-		server->connections_.erase(fd);
+		std::lock_guard client_lock(server->clients_mutex_);
+
+		const ClientData& client = server->clients_.at(fd);
+
+		{
+			std::lock_guard event_lock(server->events_mutex_);
+			server->disconnection_event_.invoke(client);
+		}
+
+		server->clients_.erase(fd);
+
 		std::cout << "client disconnected\n";
 	}
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "events/member_function.hpp"
+#include <iostream>
 #include <unordered_set>
 
 namespace fluffy_fox
@@ -23,7 +24,7 @@ namespace fluffy_fox
 		template<typename O>
 		void subscribe(void (O::*member_func)(Args...), O* obj)
 		{
-			subscribers_.emplace(member_func, obj);
+			subscribe(EventFunction<Args...>(member_func, obj));
 		}
 
 		template<typename O>
@@ -34,7 +35,7 @@ namespace fluffy_fox
 
 		void subscribe(std::function<void(Args...)>&& func)
 		{
-			subscribers_.emplace(func);
+			subscribe(EventFunction<Args...>(func));
 		}
 
 		void unsubscribe(std::function<void(Args...)>&& func)
@@ -42,18 +43,18 @@ namespace fluffy_fox
 			unsubscribe(EventFunction<Args...>(func));
 		}
 
-		void subscribe(EventFunction<Args...>&& fun)
+		virtual void subscribe(EventFunction<Args...>&& fun)
 		{
 			subscribers_.emplace(fun);
 		}
 
-		void unsubscribe(EventFunction<Args...>&& fun)
+		virtual void unsubscribe(EventFunction<Args...>&& fun)
 		{
 			subscribers_.erase(fun);
 		}
 
 		// does not guarantee order of execution
-		void invoke(Args... arg)
+		virtual void invoke(Args... arg)
 		{
 			for (const EventFunction<Args...>& func : subscribers_)
 			{

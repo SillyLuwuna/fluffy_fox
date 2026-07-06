@@ -2,7 +2,6 @@
 #include "networking/tcp_client.hpp"
 #include "networking/tcp_server.hpp"
 #include <iostream>
-#include <thread>
 
 using namespace fluffy_fox;
 using namespace fluffy_fox::networking;
@@ -26,12 +25,25 @@ int main(int argc, char **argv)
 	{
 		TcpServer server(1, 13774);
 		server.data_received_event() += on_message_received;
-		server.start();
+		bool success = server.start();
+		if (!success)
+		{
+			return 1;
+		}
+
+		std::string message;
+		std::getline(std::cin, message);
+
+		server.stop();
 	}
 	else if (type == "client")
 	{
 		TcpClient client;
-		std::jthread t(&TcpClient::connect, &client, "localhost", 13774);
+		bool success = client.connect("localhost", 13774);
+		if (!success)
+		{
+			return 1;
+		}
 
 		std::string message;
 		std::getline(std::cin, message);

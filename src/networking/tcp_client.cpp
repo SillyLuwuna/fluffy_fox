@@ -17,6 +17,7 @@ TcpClient::TcpClient() :
 	base_(nullptr),
 	event_buffer_(nullptr),
 	event_buffer_mutex_(),
+	events_mutex_(),
 	connected_(false),
 	is_connecting_or_disconnecting_mutex_(),
 	event_thread_()
@@ -41,11 +42,11 @@ TcpClient::~TcpClient()
 
 bool TcpClient::connect(const std::string& ip, uint16_t port)
 {
-	std::lock_guard<std::mutex> lock(is_connecting_or_disconnecting_mutex_);
+	std::lock_guard lock(is_connecting_or_disconnecting_mutex_);
 
-	if (connected_) return true;
+	if (connected_.load()) return true;
 
-	std::lock_guard<std::mutex> lock_buffer(event_buffer_mutex_);
+	std::lock_guard lock_buffer(event_buffer_mutex_);
 
 	evutil_socket_t sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock < 0)
@@ -90,7 +91,7 @@ bool TcpClient::connect(const std::string& ip, uint16_t port)
 		return false;
 	}
 
-	connected_ = true;
+	connected_.store(true);
 
 	event_thread_ = std::jthread(&TcpClient::run, this);
 
@@ -99,14 +100,23 @@ bool TcpClient::connect(const std::string& ip, uint16_t port)
 
 void TcpClient::disconnect()
 {
-	std::lock_guard<std::mutex> lock(is_connecting_or_disconnecting_mutex_);
+	std::lock_guard lock(is_connecting_or_disconnecting_mutex_);
 
-	if (!connected_) return;
+	if (!connected_.exchange(false)) return;
 
+	std::cout << "disconnect()\n";
 	event_base_loopbreak(base_);
 
+	if (event_thread_.joinable())
 	{
-		std::lock_guard<std::mutex> lock(event_buffer_mutex_);
+		std::cout << "uwu\n"; // FIXME is being called from the joining thread itself!
+		event_thread_.join();
+	}
+
+	std::cout << "owo\n";
+
+	{
+		std::lock_guard lock(event_buffer_mutex_);
 		if (event_buffer_)
 		{
 			bufferevent_free(event_buffer_);
@@ -114,25 +124,28 @@ void TcpClient::disconnect()
 		}
 	}
 
-	if (event_thread_.joinable())
 	{
-		event_thread_.request_stop();
-		event_thread_.join();
+		std::lock_guard event_lock(events_mutex_);
+		disconnect_event_.invoke();
 	}
-
-	connected_ = false;
-
-	disconnect_event_.invoke();
 }
 
 bool TcpClient::is_connected() const
 {
-	return connected_;
+	return connected_.load();
 }
 
 void TcpClient::run()
 {
-	event_base_dispatch(base_);
+	int success = event_base_dispatch(base_);
+	if (success < 0)
+	{
+		std::cerr << "error on stopping event loop\n";
+	}
+	else if (success > 0)
+	{
+		std::cerr << "out of events in loop\n";
+	}
 }
 
 void TcpClient::send_data(const std::vector<uint8_t>& data)
@@ -142,9 +155,9 @@ void TcpClient::send_data(const std::vector<uint8_t>& data)
 
 void TcpClient::send_data(const uint8_t* data, size_t size)
 {
-	std::lock_guard<std::mutex> lock(event_buffer_mutex_);
+	std::lock_guard lock(event_buffer_mutex_);
 
-	if (event_buffer_ && connected_)
+	if (event_buffer_ && connected_.load())
 	{
 		int success = bufferevent_write(event_buffer_, data, size);
 		if (success < 0)
@@ -165,7 +178,10 @@ void TcpClient::on_read(bufferevent* buffer, void* ctx)
 	std::vector<uint8_t> data(len);
 	evbuffer_remove(input, data.data(), len);
 
-	client->on_data_received_.invoke(data);
+	{
+		std::lock_guard event_lock(client->events_mutex_);
+		client->on_data_received_.invoke(data);
+	}
 }
 
 void TcpClient::on_event(bufferevent*, short events, void* ctx)
@@ -175,7 +191,10 @@ void TcpClient::on_event(bufferevent*, short events, void* ctx)
 	if (events & BEV_EVENT_CONNECTED)
 	{
 		std::cout << "connected to server\n";
-		client->connect_event_.invoke();
+		{
+			std::lock_guard event_lock(client->events_mutex_);
+			client->connect_event_.invoke();
+		}
 	}
 
 	if (events & BEV_EVENT_ERROR)

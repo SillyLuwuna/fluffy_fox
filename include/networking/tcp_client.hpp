@@ -7,6 +7,7 @@
 #include "event2/bufferevent.h"
 #include "event2/buffer.h"
 #include "events/event.hpp"
+#include "events/thread_safe_event.hpp"
 
 namespace fluffy_fox::networking
 {
@@ -14,15 +15,16 @@ namespace fluffy_fox::networking
 	class TcpClient
 	{
 	private:
-		Event<> connect_event_;
-		Event<> disconnect_event_;
-		Event<const std::vector<uint8_t>&> on_data_received_;
+		ThreadSafeEvent<> connect_event_;
+		ThreadSafeEvent<> disconnect_event_;
+		ThreadSafeEvent<const std::vector<uint8_t>&> on_data_received_;
 
 		event_base* base_;
 		bufferevent* event_buffer_;
 		std::mutex event_buffer_mutex_;
+		std::mutex events_mutex_;
 
-		bool connected_;
+		std::atomic<bool> connected_;
 		std::mutex is_connecting_or_disconnecting_mutex_;
 		std::jthread event_thread_;
 
