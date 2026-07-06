@@ -9,10 +9,10 @@
 namespace fluffy_fox
 {
 	template<typename Signature>
-	class MemberFunction;
+	class Function;
 
 	template<typename T, typename... Args>
-	class MemberFunction<T(Args...)>
+	class Function<T(Args...)>
 	{
 		private:
 			const std::function<T(Args...)> func_;
@@ -20,14 +20,14 @@ namespace fluffy_fox
 
 		public:
 			template<typename O>
-			MemberFunction(T (O::*member_func)(Args...), O* obj) :
+			Function(T (O::*member_func)(Args...), O* obj) :
 				func_([obj, member_func](Args... args) -> T { return (obj->*member_func)(std::forward<Args>(args)...); }),
 				obj_((uint64_t)(void *)obj)
 			{
 			}
 
 			// TODO this isn't a "MemberFunction"
-			MemberFunction(std::function<T(Args...)> func) :
+			Function(std::function<T(Args...)> func) :
 				func_(func),
 				obj_(0)
 			{
@@ -43,7 +43,12 @@ namespace fluffy_fox
 				return obj_;
 			}
 
-			bool operator==(const MemberFunction& other) const
+			std::function<T(Args...)> get_function_raw() const
+			{
+				return func_;
+			}
+
+			bool operator==(const Function& other) const
 			{
 				return (func_.target_type().name() == other.func_.target_type().name()) && (obj_ == other.obj_);
 			}
@@ -61,9 +66,9 @@ namespace fluffy_fox
 namespace std
 {
 	template<typename Signature>
-	struct hash<fluffy_fox::MemberFunction<Signature>>
+	struct hash<fluffy_fox::Function<Signature>>
 	{
-		std::size_t operator()(const fluffy_fox::MemberFunction<Signature>& func) const
+		std::size_t operator()(const fluffy_fox::Function<Signature>& func) const
 		{
 			return func.hash();
 		}

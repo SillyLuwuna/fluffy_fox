@@ -1,0 +1,45 @@
+#pragma once
+#include "events/function.hpp"
+#include <condition_variable>
+#include <cstdint>
+#include <functional>
+#include <future>
+#include <mutex>
+#include <queue>
+#include <thread>
+
+namespace fluffy_fox::threading
+{
+	class ThreadPool
+	{
+	private:
+		std::mutex queue_mutex_;
+		std::condition_variable work_call_;
+		std::queue<std::function<void()>> tasks_;
+
+		std::vector<std::thread> workers_;
+
+		bool stop_;
+		void worker_loop();
+
+		void enqueue(std::function<void()> task);
+
+	public:
+		ThreadPool(const ThreadPool&) = delete;
+		ThreadPool(ThreadPool&&) = delete;
+		ThreadPool& operator=(const ThreadPool&) = delete;
+		ThreadPool& operator=(ThreadPool&&) = delete;
+
+		ThreadPool(uint8_t threads);
+		~ThreadPool();
+
+		template<typename T>
+		std::future<T> execute(Function<T()> func)
+		{
+			std::packaged_task<T()> task(func.get_function_raw());
+			std::future<T> future = task.get_future();
+			enqueue([t = std::move(task)]() mutable { t(); });
+			return future;
+		}
+	};
+}

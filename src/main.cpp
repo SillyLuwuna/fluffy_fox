@@ -6,10 +6,26 @@
 using namespace fluffy_fox;
 using namespace fluffy_fox::networking;
 
-void on_message_received(const ClientData& client, const std::vector<uint8_t>& data)
+void server_on_message_received(const ClientData& client, const std::vector<uint8_t>& data)
 {
 	std::string_view str((const char*)data.data(), data.size());
 	std::cout << "[" << client.ip << ":" << client.port << "] " << str << std::endl;
+}
+
+void client_on_message_received(const std::vector<uint8_t>& data)
+{
+	std::string_view str((const char*)data.data(), data.size());
+	std::cout << "[server] " << str << std::endl;
+}
+
+void client_connection()
+{
+
+}
+
+void client_disconnection()
+{
+
 }
 
 int main(int argc, char **argv)
@@ -24,7 +40,7 @@ int main(int argc, char **argv)
 	if (type == "server")
 	{
 		TcpServer server(1, 13774);
-		server.data_received_event() += on_message_received;
+		server.data_received_event() += server_on_message_received;
 		bool success = server.start();
 		if (!success)
 		{
@@ -39,6 +55,9 @@ int main(int argc, char **argv)
 	else if (type == "client")
 	{
 		TcpClient client;
+		client.data_received_event() += client_on_message_received;
+		client.connection_event() += client_connection;
+		client.disconnection_event() += client_disconnection;
 		bool success = client.connect("localhost", 13774);
 		if (!success)
 		{
@@ -47,7 +66,7 @@ int main(int argc, char **argv)
 
 		std::string message;
 		std::getline(std::cin, message);
-		while (message != "")
+		while (client.is_connected() && message != "")
 		{
 			client.send_data((uint8_t*)message.data(), message.length());
 			std::getline(std::cin, message);

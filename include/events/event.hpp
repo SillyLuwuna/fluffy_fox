@@ -1,13 +1,13 @@
 #pragma once
 
-#include "events/member_function.hpp"
+#include "events/function.hpp"
 #include <iostream>
 #include <unordered_set>
 
 namespace fluffy_fox
 {
 	template <typename ...Args>
-	using EventFunction = MemberFunction<void(Args...)>;
+	using EventFunction = Function<void(Args...)>;
 
 	template<typename ...Args>
 	class Event
