@@ -5,6 +5,7 @@
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
+#include <netinet/tcp.h> // linux only?
 
 using namespace fluffy_fox;
 using namespace fluffy_fox::networking;
@@ -142,6 +143,13 @@ void TcpServer::on_accept(evconnlistener* listener, evutil_socket_t fd, sockaddr
 		std::cerr << "error creating buffer\n";
 		evutil_closesocket(fd);
 		return;
+	}
+
+	int flag_set = 1;
+	int socketop_success = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &flag_set, sizeof(flag_set));
+	if (!socketop_success)
+	{
+		std::cerr << "could not set socket options\n";
 	}
 
 	char ip[INET_ADDRSTRLEN];

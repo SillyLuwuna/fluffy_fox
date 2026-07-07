@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <netinet/tcp.h> // linux only?
 #include <stdexcept>
 #include <thread>
 
@@ -59,6 +60,13 @@ bool TcpClient::connect(const std::string& ip, uint16_t port)
 	}
 
 	evutil_make_socket_nonblocking(sock);
+
+	int flag_set = 1;
+	int socketop_success = setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &flag_set, sizeof(flag_set));
+	if (!socketop_success)
+	{
+		std::cerr << "could not set socket options\n";
+	}
 
 	hostent* host = gethostbyname(ip.c_str());
 	if (!host)
