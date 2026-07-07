@@ -19,14 +19,16 @@ namespace fluffy_fox::networking
 		uint16_t max_connections_;
 		uint16_t port_;
 
+		ThreadSafeEvent<> start_event_;
+		ThreadSafeEvent<> stop_event_;
 		ThreadSafeEvent<const Connection&> connection_event_;
 		ThreadSafeEvent<const Connection&> disconnection_event_;
 		ThreadSafeEvent<const Connection&, const std::vector<uint8_t>&> data_received_event_;
 
 		event_base* base_;
 		evconnlistener* listener_;
-		std::unordered_map<int, Connection> connections_;
-		std::unordered_set<Connection> connected_endpoints_;
+		std::unordered_map<int, Connection> connection_fds_;
+		std::unordered_set<Connection> connections_;
 		mutable std::mutex connections_mutex_;
 
 		std::mutex is_connecting_or_disconnecting_mutex_;
@@ -57,7 +59,16 @@ namespace fluffy_fox::networking
 
 		bool is_connected(const Connection& connection) const;
 		void disconnect(Connection& connection);
+		void send_data(const std::vector<uint8_t>& data, const Connection& connection);
+		void send_data(const uint8_t* data, size_t size, const Connection& connection);
 
+		std::vector<const Connection*> connections() const;
+
+		uint16_t port();
+		uint16_t max_connections();
+
+		Event<>& start_event();
+		Event<>& stop_event();
 		Event<const Connection&>& connection_event();
 		Event<const Connection&>& disconnection_event();
 		Event<const Connection&, const std::vector<uint8_t>&>& data_received_event();

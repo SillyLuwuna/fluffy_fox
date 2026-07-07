@@ -209,7 +209,7 @@ void TcpClient::on_event(bufferevent*, short events, void* ctx)
 
 	if (events & BEV_EVENT_CONNECTED)
 	{
-		std::cout << "connected to server\n";
+		// std::cout << "connected to server\n";
 		if (!client->connected_.load())
 		{
 			client->connect_result_ = true;
@@ -233,23 +233,23 @@ void TcpClient::on_event(bufferevent*, short events, void* ctx)
 		}
 		else
 		{
-			std::cout << "disconnected from server\n";
+			// std::cout << "disconnected from server\n";
 			client->disconnect();
 		}
 	}
 }
 
-Event<> TcpClient::connection_event()
+Event<>& TcpClient::connection_event()
 {
 	return connect_event_;
 }
 
-Event<> TcpClient::disconnection_event()
+Event<>& TcpClient::disconnection_event()
 {
 	return disconnect_event_;
 }
 
-Event<const std::vector<uint8_t>&> TcpClient::data_received_event()
+Event<const std::vector<uint8_t>&>& TcpClient::data_received_event()
 {
 	return data_received_event_;
 }

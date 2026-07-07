@@ -12,8 +12,6 @@
 
 namespace fluffy_fox::networking
 {
-	// using namespace threading;
-	// TODO timeout / heartbeat
 	// TODO instead of creating a new thread all the time keep the same thread working and activate it / deactivate it
 	class TcpClient
 	{
@@ -60,8 +58,8 @@ namespace fluffy_fox::networking
 		void send_data(const std::vector<uint8_t>& data);
 		void send_data(const uint8_t* data, size_t size);
 
-		Event<> connection_event();
-		Event<> disconnection_event();
-		Event<const std::vector<uint8_t>&> data_received_event();
+		Event<>& connection_event();
+		Event<>& disconnection_event();
+		Event<const std::vector<uint8_t>&>& data_received_event();
 	};
 }

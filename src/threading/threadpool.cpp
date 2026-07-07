@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <iostream>
 #include "threading/threadpool.hpp"
 
 using namespace fluffy_fox;

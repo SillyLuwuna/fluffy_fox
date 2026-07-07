@@ -24,13 +24,19 @@ TcpServer::TcpServer(uint16_t max_connections, uint16_t port) :
 		throw std::runtime_error("failed to create event base");
 	}
 
+	connection_fds_.reserve(max_connections);
 	connections_.reserve(max_connections);
-	connected_endpoints_.reserve(max_connections);
 }
 
 TcpServer::~TcpServer()
 {
 	stop();
+
+	if (event_thread_.joinable())
+	{
+		event_thread_.join();
+	}
+
 	if (base_)
 	{
 		event_base_free(base_);
@@ -57,7 +63,7 @@ bool TcpServer::start()
 		return false;
 	}
 
-	std::cout << "server listening on port " << port_ << "\n";
+	// std::cout << "server listening on port " << port_ << "\n";
 
 	running_.store(true);
 	if (event_thread_.joinable())
@@ -65,6 +71,8 @@ bool TcpServer::start()
 		event_thread_.join();
 	}
 	event_thread_ = std::jthread(&TcpServer::run, this);
+
+	event_invoker_.execute(Function<void()>([this]() { this->start_event_.invoke(); } ));
 
 	return true;
 }
@@ -89,13 +97,15 @@ void TcpServer::stop()
 	}
 
 	std::lock_guard connection_lock(connections_mutex_);
-	for (auto& [fd, connection] : connections_)
+	for (auto& [fd, connection] : connection_fds_)
 	{
 		bufferevent_free(connection.buffer_event);
 		connection.buffer_event = nullptr;
 	}
+	connection_fds_.clear();
 	connections_.clear();
-	connected_endpoints_.clear();
+
+	event_invoker_.execute(Function<void()>([this]() { this->stop_event_.invoke(); } ));
 }
 
 void TcpServer::run()
@@ -119,9 +129,9 @@ void TcpServer::on_accept(evconnlistener* listener, evutil_socket_t fd, sockaddr
 	if (!server->running_.load()) return;
 
 	std::lock_guard connection_lock(server->connections_mutex_);
-	if (server->connections_.size() >= server->max_connections_)
+	if (server->connection_fds_.size() >= server->max_connections_)
 	{
-		std::cout << "max connections reached! denying connection\n";
+		// std::cout << "max connections reached! denying connection\n";
 		evutil_closesocket(fd);
 		return;
 	}
@@ -140,13 +150,13 @@ void TcpServer::on_accept(evconnlistener* listener, evutil_socket_t fd, sockaddr
 	uint16_t port = ntohs(sin->sin_port);
 
 	Connection connection(ip, port, buffer);
-	server->connections_.emplace(connection.fd, connection);
-	server->connected_endpoints_.emplace(connection);
+	server->connection_fds_.emplace(connection.fd, connection);
+	server->connections_.emplace(connection);
 
 	bufferevent_setcb(buffer, on_read, nullptr, on_event, server);
 	bufferevent_enable(buffer, EV_READ | EV_WRITE);
 
-	std::cout << "client connected " << ip << ":" << port << "\n";
+	// std::cout << "client connected " << ip << ":" << port << "\n";
 
 	server->event_invoker_.execute(Function<void()>(
 		[server, c = connection]() { server->connection_event_.invoke(c); }
@@ -166,7 +176,7 @@ void TcpServer::on_read(bufferevent* buffer_event, void* ctx)
 	evbuffer_remove(input, data.data(), len);
 
 	std::lock_guard connection_lock(server->connections_mutex_);
-	const Connection& connection = server->connections_.at(fd);
+	const Connection& connection = server->connection_fds_.at(fd);
 
 	server->event_invoker_.execute(Function<void()>(
 		[server, c = connection, d = std::move(data)]() { server->data_received_event_.invoke(c, d); }
@@ -187,7 +197,24 @@ void TcpServer::on_event(bufferevent* buffer_event, short events, void* ctx)
 	{
 		server->disconnect(fd);
 
-		std::cout << "client disconnected\n";
+		// std::cout << "client disconnected\n";
+	}
+}
+
+void TcpServer::send_data(const std::vector<uint8_t>& data, const Connection& connection)
+{
+	send_data(data.data(), data.size(), connection);
+}
+
+void TcpServer::send_data(const uint8_t* data, size_t size, const Connection& connection)
+{
+	if (!running_.load()) return;
+	if (!connection.buffer_event) return;
+
+	int success = bufferevent_write(connection.buffer_event, data, size);
+	if (success < 0)
+	{
+		std::cerr << "could not send message\n";
 	}
 }
 
@@ -196,7 +223,7 @@ bool TcpServer::is_connected(const Connection& connection) const
 	if (!running_.load()) return false;
 
 	std::lock_guard connection_lock(connections_mutex_);
-	return connected_endpoints_.contains(connection);
+	return connections_.contains(connection);
 }
 
 void TcpServer::disconnect(int fd)
@@ -204,7 +231,7 @@ void TcpServer::disconnect(int fd)
 	if (!running_.load()) return;
 
 	std::unique_lock connection_lock(connections_mutex_);
-	Connection connection = connections_.at(fd);
+	Connection connection = connection_fds_.at(fd);
 	connection_lock.unlock();
 
 	disconnect(connection);
@@ -216,8 +243,8 @@ void TcpServer::disconnect(Connection& connection)
 
 	std::lock_guard connection_lock(connections_mutex_);
 
-	connections_.erase(connection.fd);
-	connected_endpoints_.erase(connection);
+	connection_fds_.erase(connection.fd);
+	connections_.erase(connection);
 
 	bufferevent_free(connection.buffer_event);
 	connection.buffer_event = nullptr;
@@ -225,6 +252,39 @@ void TcpServer::disconnect(Connection& connection)
 	event_invoker_.execute(Function<void()>(
 		[this, connection]() { this->disconnection_event_.invoke(connection); }
 	));
+}
+
+std::vector<const Connection*> TcpServer::connections() const
+{
+	std::vector<const Connection*> result;
+	result.reserve(connections_.size());
+
+	for (const Connection& connection : connections_)
+	{
+		result.emplace_back(&connection);
+	}
+
+	return result;
+}
+
+uint16_t TcpServer::port()
+{
+	return port_;
+}
+
+uint16_t TcpServer::max_connections()
+{
+	return max_connections_;
+}
+
+Event<>& TcpServer::start_event()
+{
+	return start_event_;
+}
+
+Event<>& TcpServer::stop_event()
+{
+	return stop_event_;
 }
 
 Event<const Connection&>& TcpServer::connection_event()
