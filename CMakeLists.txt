@@ -6,38 +6,40 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 file(GLOB_RECURSE SRC_FILES src/*.cpp)
 file(GLOB_RECURSE TEST_FILES test/*.cpp)
 
-project(networking)
+project(fluffy_fox)
 
-add_executable(networking ${SRC_FILES})
+add_executable(fluffy_fox ${SRC_FILES})
 
-target_compile_options(networking PRIVATE
+target_compile_options(fluffy_fox PRIVATE
 	-Wall
 	-Wextra
 	-Wpedantic
 	-O2
 )
 
-target_link_options(networking PRIVATE
-)
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
+# set(GLFW_BUILD_WAYLAND ON CACHE BOOL "" FORCE)
+
+set(BGFX_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(BGFX_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BGFX_INSTALL OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(lib/libevent)
-target_link_libraries(networking
+add_subdirectory(lib/bgfx)
+add_subdirectory(lib/glfw)
+target_link_libraries(fluffy_fox
 	PRIVATE
 	event
 	event_core
 	event_extra
 	event_pthreads
 	pthread
+	bgfx
+	glfw
 )
 
-target_include_directories(networking PUBLIC include lib/doctest)
-target_include_directories(networking PUBLIC include)
-
-
-
-
-# testing
-# project(cmake_test LANGUAGES CXX)
-# list(FILTER SRC_FILES EXCLUDE REGEX ".*src/main.cpp$")
-# add_executable(test ${SRC_FILES} ${TEST_FILES} ${HEADER_FILES} ${IMPLEMENTATION_FILES})
-# target_include_directories(test PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include) # includes
+target_include_directories(fluffy_fox PUBLIC include lib/doctest)
+target_include_directories(fluffy_fox PUBLIC include)
