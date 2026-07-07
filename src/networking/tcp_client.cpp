@@ -13,19 +13,13 @@ using namespace fluffy_fox;
 using fluffy_fox::networking::TcpClient;
 
 TcpClient::TcpClient() :
-	connect_event_(),
-	disconnect_event_(),
-	data_received_event_(),
 	base_(nullptr),
 	event_buffer_(nullptr),
-	event_buffer_mutex_(),
-	events_mutex_(),
 	connected_(false),
-	is_running_event_(false),
-	is_connecting_or_disconnecting_mutex_(),
-	event_thread_()
+	event_invoker_(1) // MUST be 1
 {
 	evthread_use_pthreads();
+
 	base_ = event_base_new();
 	if (!base_)
 	{
@@ -37,18 +31,20 @@ TcpClient::~TcpClient()
 {
 	disconnect();
 
+	if (event_thread_.joinable())
+	{
+		event_thread_.join();
+	}
+
 	if (base_)
 	{
 		event_base_free(base_);
 	}
 }
 
-// returns if an error ocurred
-// may not be called from within an event
+// returns if an error ocurred or not
 bool TcpClient::connect(const std::string& ip, uint16_t port)
 {
-	if (is_running_event_.load() && is_worker_thread()) return false;
-
 	std::lock_guard lock(is_connecting_or_disconnecting_mutex_);
 
 	if (connected_.load()) return true;
@@ -98,22 +94,39 @@ bool TcpClient::connect(const std::string& ip, uint16_t port)
 		return false;
 	}
 
-	connected_.store(true);
+	connect_result_done_ = false;
 
 	if (event_thread_.joinable())
 	{
 		event_thread_.join();
 	}
-	event_thread_ = std::jthread(&TcpClient::run, this);
+	event_thread_ = std::jthread(&TcpClient::run, this); // todo make something more efficient than always starting a new thread
+
+	std::unique_lock connecting_lock(connecting_);
+	connect_result_condition_.wait(connecting_lock, [this]() { return this->connect_result_done_; });
+	connecting_lock.unlock();
+
+	if (!connect_result_)
+	{
+		event_base_loopbreak(base_);
+
+		if (event_buffer_)
+		{
+			bufferevent_free(event_buffer_);
+			event_buffer_ = nullptr;
+		}
+
+		return false;
+	}
+
+	connected_.store(true);
+	event_invoker_.execute(Function<void()>(&ThreadSafeEvent<>::invoke, &connect_event_));
 
 	return true;
 }
 
-// may not be called from within an event
 void TcpClient::disconnect()
 {
-	if (is_running_event_.load() && is_worker_thread()) return;
-
 	std::lock_guard lock(is_connecting_or_disconnecting_mutex_);
 
 	if (!connected_.exchange(false)) return;
@@ -129,12 +142,7 @@ void TcpClient::disconnect()
 		}
 	}
 
-	{
-		is_running_event_.store(true);
-		std::lock_guard event_lock(events_mutex_);
-		disconnect_event_.invoke();
-		is_running_event_.store(false);
-	}
+	event_invoker_.execute(Function<void()>(&ThreadSafeEvent<>::invoke, &disconnect_event_));
 }
 
 bool TcpClient::is_worker_thread()
@@ -156,7 +164,7 @@ void TcpClient::run()
 	}
 	else if (success > 0)
 	{
-		std::cerr << "out of events in loop\n";
+		// std::cerr << "out of events in loop\n";
 	}
 }
 
@@ -190,12 +198,9 @@ void TcpClient::on_read(bufferevent* buffer, void* ctx)
 	std::vector<uint8_t> data(len);
 	evbuffer_remove(input, data.data(), len);
 
-	{
-		client->is_running_event_.store(true);
-		std::lock_guard event_lock(client->events_mutex_);
-		client->data_received_event_.invoke(data);
-		client->is_running_event_.store(false);
-	}
+	client->event_invoker_.execute(Function<void()>(
+		[d = std::move(data), client]() { client->data_received_event_.invoke(d); }
+	));
 }
 
 void TcpClient::on_event(bufferevent*, short events, void* ctx)
@@ -205,11 +210,11 @@ void TcpClient::on_event(bufferevent*, short events, void* ctx)
 	if (events & BEV_EVENT_CONNECTED)
 	{
 		std::cout << "connected to server\n";
+		if (!client->connected_.load())
 		{
-			client->is_running_event_.store(true);
-			std::lock_guard event_lock(client->events_mutex_);
-			client->connect_event_.invoke();
-			client->is_running_event_.store(false);
+			client->connect_result_ = true;
+			client->connect_result_done_ = true;
+			client->connect_result_condition_.notify_one();
 		}
 	}
 
@@ -220,8 +225,17 @@ void TcpClient::on_event(bufferevent*, short events, void* ctx)
 
 	if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR))
 	{
-		std::cout << "disconnected from server\n";
-		client->disconnect();
+		if (!client->connected_.load())
+		{
+			client->connect_result_ = false;
+			client->connect_result_done_ = true;
+			client->connect_result_condition_.notify_one();
+		}
+		else
+		{
+			std::cout << "disconnected from server\n";
+			client->disconnect();
+		}
 	}
 }
 

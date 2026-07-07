@@ -22,7 +22,7 @@ namespace fluffy_fox::threading
 		bool stop_;
 		void worker_loop();
 
-		void enqueue(std::function<void()> task);
+		void enqueue(std::function<void()>&& task);
 
 	public:
 		ThreadPool(const ThreadPool&) = delete;
@@ -34,11 +34,11 @@ namespace fluffy_fox::threading
 		~ThreadPool();
 
 		template<typename T>
-		std::future<T> execute(Function<T()> func)
+		std::future<T> execute(Function<T()>&& func)
 		{
-			std::packaged_task<T()> task(func.get_function_raw());
-			std::future<T> future = task.get_future();
-			enqueue([t = std::move(task)]() mutable { t(); });
+			std::shared_ptr<std::packaged_task<T()>> task_ptr = std::make_shared<std::packaged_task<T()>>(func.get_function_raw());
+			std::future<T> future = task_ptr->get_future();
+			enqueue([task_ptr]() { (*task_ptr)(); });
 			return future;
 		}
 	};

@@ -8,9 +8,11 @@
 #include "event2/buffer.h"
 #include "events/event.hpp"
 #include "events/thread_safe_event.hpp"
+#include "threading/threadpool.hpp"
 
 namespace fluffy_fox::networking
 {
+	// using namespace threading;
 	// TODO timeout / heartbeat
 	// TODO instead of creating a new thread all the time keep the same thread working and activate it / deactivate it
 	class TcpClient
@@ -23,12 +25,17 @@ namespace fluffy_fox::networking
 		event_base* base_;
 		bufferevent* event_buffer_;
 		std::mutex event_buffer_mutex_;
-		std::mutex events_mutex_;
 
 		std::atomic<bool> connected_;
-		std::atomic<bool> is_running_event_;
 		std::mutex is_connecting_or_disconnecting_mutex_;
+
 		std::jthread event_thread_;
+		threading::ThreadPool event_invoker_;
+
+		std::mutex connecting_;
+		std::condition_variable connect_result_condition_;
+		bool connect_result_done_;
+		bool connect_result_;
 
 		void run();
 		bool is_worker_thread();

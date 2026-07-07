@@ -58,7 +58,14 @@ int main(int argc, char **argv)
 		client.data_received_event() += client_on_message_received;
 		client.connection_event() += client_connection;
 		client.disconnection_event() += client_disconnection;
-		bool success = client.connect("localhost", 13774);
+
+		bool success = false;
+		while (!(success = client.connect("localhost", 13774)))
+		{
+			std::cout << "couldn't connect. Trying again...\n";
+			std::this_thread::sleep_for(std::chrono::seconds(1));
+		}
+		// bool success = client.connect("localhost", 13774);
 		if (!success)
 		{
 			return 1;

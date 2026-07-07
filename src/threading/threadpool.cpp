@@ -45,7 +45,7 @@ void ThreadPool::worker_loop()
 	}
 }
 
-void ThreadPool::enqueue(std::function<void()> task)
+void ThreadPool::enqueue(std::function<void()>&& task)
 {
 	{
 		std::lock_guard lock(queue_mutex_);
