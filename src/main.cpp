@@ -6,7 +6,7 @@
 using namespace fluffy_fox;
 using namespace fluffy_fox::networking;
 
-void server_on_message_received(const ClientData& client, const std::vector<uint8_t>& data)
+void server_on_message_received(const Connection& client, const std::vector<uint8_t>& data)
 {
 	std::string_view str((const char*)data.data(), data.size());
 	std::cout << "[" << client.ip << ":" << client.port << "] " << str << std::endl;

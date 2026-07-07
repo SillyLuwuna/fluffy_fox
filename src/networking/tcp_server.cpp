@@ -12,25 +12,20 @@ using namespace fluffy_fox::networking;
 TcpServer::TcpServer(uint16_t max_connections, uint16_t port) :
 	max_connections_(max_connections),
 	port_(port),
-	connection_event_(),
-	disconnection_event_(),
-	data_received_event_(),
 	base_(nullptr),
 	listener_(nullptr),
-	clients_(),
-	is_connecting_or_disconnecting_mutex_(),
-	clients_mutex_(),
-	events_mutex_(),
 	running_(false),
-	event_thread_()
+	event_invoker_(1) // MUST BE 1
 {
 	evthread_use_pthreads();
-	clients_.reserve(max_connections);
 	base_ = event_base_new();
 	if (!base_)
 	{
 		throw std::runtime_error("failed to create event base");
 	}
+
+	connections_.reserve(max_connections);
+	connected_endpoints_.reserve(max_connections);
 }
 
 TcpServer::~TcpServer()
@@ -65,6 +60,10 @@ bool TcpServer::start()
 	std::cout << "server listening on port " << port_ << "\n";
 
 	running_.store(true);
+	if (event_thread_.joinable())
+	{
+		event_thread_.join();
+	}
 	event_thread_ = std::jthread(&TcpServer::run, this);
 
 	return true;
@@ -89,13 +88,14 @@ void TcpServer::stop()
 		listener_ = nullptr;
 	}
 
-	std::lock_guard client_lock(clients_mutex_);
-	for (auto& [fd, client] : clients_)
+	std::lock_guard connection_lock(connections_mutex_);
+	for (auto& [fd, connection] : connections_)
 	{
-		bufferevent_free(client.buffer_event);
-		client.buffer_event = nullptr;
+		bufferevent_free(connection.buffer_event);
+		connection.buffer_event = nullptr;
 	}
-	clients_.clear();
+	connections_.clear();
+	connected_endpoints_.clear();
 }
 
 void TcpServer::run()
@@ -118,15 +118,15 @@ void TcpServer::on_accept(evconnlistener* listener, evutil_socket_t fd, sockaddr
 
 	if (!server->running_.load()) return;
 
-	std::lock_guard client_lock(server->clients_mutex_);
-	if (server->clients_.size() >= server->max_connections_)
+	std::lock_guard connection_lock(server->connections_mutex_);
+	if (server->connections_.size() >= server->max_connections_)
 	{
 		std::cout << "max connections reached! denying connection\n";
 		evutil_closesocket(fd);
 		return;
 	}
 
-	bufferevent* buffer = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE); // TODO "do not rely on bufferevent"?
+	bufferevent* buffer = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
 	if (!buffer)
 	{
 		std::cerr << "error creating buffer\n";
@@ -139,18 +139,18 @@ void TcpServer::on_accept(evconnlistener* listener, evutil_socket_t fd, sockaddr
 	inet_ntop(AF_INET, &sin->sin_addr, ip, sizeof(ip));
 	uint16_t port = ntohs(sin->sin_port);
 
-	ClientData client(ip, port, buffer);
-	server->clients_.emplace(client.fd, client);
+	Connection connection(ip, port, buffer);
+	server->connections_.emplace(connection.fd, connection);
+	server->connected_endpoints_.emplace(connection);
 
 	bufferevent_setcb(buffer, on_read, nullptr, on_event, server);
 	bufferevent_enable(buffer, EV_READ | EV_WRITE);
 
 	std::cout << "client connected " << ip << ":" << port << "\n";
 
-	{
-		std::lock_guard event_lock(server->events_mutex_);
-		server->connection_event_.invoke(client);
-	}
+	server->event_invoker_.execute(Function<void()>(
+		[server, c = connection]() { server->connection_event_.invoke(c); }
+	));
 }
 
 void TcpServer::on_read(bufferevent* buffer_event, void* ctx)
@@ -165,13 +165,12 @@ void TcpServer::on_read(bufferevent* buffer_event, void* ctx)
 	std::vector<uint8_t> data(len);
 	evbuffer_remove(input, data.data(), len);
 
-	std::lock_guard client_lock(server->clients_mutex_);
-	const ClientData& client = server->clients_.at(fd);
+	std::lock_guard connection_lock(server->connections_mutex_);
+	const Connection& connection = server->connections_.at(fd);
 
-	{
-		std::lock_guard event_lock(server->events_mutex_);
-		server->data_received_event_.invoke(client, data);
-	}
+	server->event_invoker_.execute(Function<void()>(
+		[server, c = connection, d = std::move(data)]() { server->data_received_event_.invoke(c, d); }
+	));
 }
 
 void TcpServer::on_event(bufferevent* buffer_event, short events, void* ctx)
@@ -181,37 +180,64 @@ void TcpServer::on_event(bufferevent* buffer_event, short events, void* ctx)
 
 	if (events & BEV_EVENT_ERROR)
 	{
-		std::cerr << "buffer event error: " << evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()) << "\n";
+		std::cerr << "socket error: " << evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()) << "\n";
 	}
 
 	if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR))
 	{
-		std::lock_guard client_lock(server->clients_mutex_);
-
-		const ClientData& client = server->clients_.at(fd);
-
-		{
-			std::lock_guard event_lock(server->events_mutex_);
-			server->disconnection_event_.invoke(client);
-		}
-
-		server->clients_.erase(fd);
+		server->disconnect(fd);
 
 		std::cout << "client disconnected\n";
 	}
 }
 
-Event<const ClientData&>& TcpServer::connection_event()
+bool TcpServer::is_connected(const Connection& connection) const
+{
+	if (!running_.load()) return false;
+
+	std::lock_guard connection_lock(connections_mutex_);
+	return connected_endpoints_.contains(connection);
+}
+
+void TcpServer::disconnect(int fd)
+{
+	if (!running_.load()) return;
+
+	std::unique_lock connection_lock(connections_mutex_);
+	Connection connection = connections_.at(fd);
+	connection_lock.unlock();
+
+	disconnect(connection);
+}
+
+void TcpServer::disconnect(Connection& connection)
+{
+	if (!running_.load()) return;
+
+	std::lock_guard connection_lock(connections_mutex_);
+
+	connections_.erase(connection.fd);
+	connected_endpoints_.erase(connection);
+
+	bufferevent_free(connection.buffer_event);
+	connection.buffer_event = nullptr;
+
+	event_invoker_.execute(Function<void()>(
+		[this, connection]() { this->disconnection_event_.invoke(connection); }
+	));
+}
+
+Event<const Connection&>& TcpServer::connection_event()
 {
 	return connection_event_;
 }
 
-Event<const ClientData&>& TcpServer::disconnection_event()
+Event<const Connection&>& TcpServer::disconnection_event()
 {
 	return disconnection_event_;
 }
 
-Event<const ClientData&, const std::vector<uint8_t>&>& TcpServer::data_received_event()
+Event<const Connection&, const std::vector<uint8_t>&>& TcpServer::data_received_event()
 {
 	return data_received_event_;
 }

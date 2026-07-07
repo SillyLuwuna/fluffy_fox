@@ -8,31 +8,32 @@
 #include "event2/buffer.h"
 #include "events/event.hpp"
 #include "events/thread_safe_event.hpp"
-#include "networking/client_data.hpp"
+#include "networking/connection.hpp"
+#include "threading/threadpool.hpp"
 
 namespace fluffy_fox::networking
 {
-	// TODO timeout / heartbeat
-	// TODO public disconnect function (should add to a queue with a mutex! else deadlock if called from inside an event)
 	class TcpServer
 	{
 	private:
 		uint16_t max_connections_;
 		uint16_t port_;
 
-		ThreadSafeEvent<const ClientData&> connection_event_;
-		ThreadSafeEvent<const ClientData&> disconnection_event_;
-		ThreadSafeEvent<const ClientData&, const std::vector<uint8_t>&> data_received_event_;
+		ThreadSafeEvent<const Connection&> connection_event_;
+		ThreadSafeEvent<const Connection&> disconnection_event_;
+		ThreadSafeEvent<const Connection&, const std::vector<uint8_t>&> data_received_event_;
 
 		event_base* base_;
 		evconnlistener* listener_;
-		std::unordered_map<int, ClientData> clients_;
+		std::unordered_map<int, Connection> connections_;
+		std::unordered_set<Connection> connected_endpoints_;
+		mutable std::mutex connections_mutex_;
+
 		std::mutex is_connecting_or_disconnecting_mutex_;
-		std::mutex clients_mutex_;
-		std::mutex events_mutex_;
 		std::atomic<bool> running_;
 
 		std::jthread event_thread_;
+		threading::ThreadPool event_invoker_;
 
 		void run();
 
@@ -40,20 +41,25 @@ namespace fluffy_fox::networking
 		static void on_read(bufferevent* buffer, void* ctx);
 		static void on_event(bufferevent* buffer, short events, void* ctx);
 
+		void disconnect(int fd);
+
 	public:
 		TcpServer(const TcpServer&) = delete;
 		TcpServer(TcpServer&&) = delete;
 		TcpServer& operator=(const TcpServer&) = delete;
 		TcpServer& operator=(TcpServer&&) = delete;
 
-		TcpServer(uint16_t max_connections, uint16_t port); // TODO max_connections actually works
+		TcpServer(uint16_t max_connections, uint16_t port);
 		~TcpServer();
 
 		bool start();
 		void stop();
 
-		Event<const ClientData&>& connection_event();
-		Event<const ClientData&>& disconnection_event();
-		Event<const ClientData&, const std::vector<uint8_t>&>& data_received_event();
+		bool is_connected(const Connection& connection) const;
+		void disconnect(Connection& connection);
+
+		Event<const Connection&>& connection_event();
+		Event<const Connection&>& disconnection_event();
+		Event<const Connection&, const std::vector<uint8_t>&>& data_received_event();
 	};
 }
