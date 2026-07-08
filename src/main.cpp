@@ -1,6 +1,11 @@
 #include "events/event.hpp"
 #include "networking/tcp_client.hpp"
 #include "networking/tcp_server.hpp"
+#include "spdlog/async.h"
+#include "spdlog/sinks/basic_file_sink.h"
+#include "spdlog/sinks/rotating_file_sink.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
+#include "spdlog/spdlog.h"
 #include <algorithm>
 #include <iostream>
 #include <cstdint>
@@ -141,139 +146,34 @@ using namespace fluffy_fox;
 // 	return 0;
 // }
 
-#if defined(__unix__)
-	#if defined(__has_include) && __has_include(<wayland-client.h>)
-		#define GLFW_EXPOSE_NATIVE_WAYLAND
-	#else
-		#define GLFW_EXPOSE_NATIVE_X11
-	#endif
-#elif defined(_WIN32)
-	#define GLFW_EXPOSE_NATIVE_WIN32
-#elif defined(__APPLE__)
-	#define GLFW_EXPOSE_NATIVE_COCOA
-#endif
-#include <GLFW/glfw3.h>
-#include <GLFW/glfw3native.h>
-#include <bgfx/bgfx.h>
+void setup_logger()
+{
+	spdlog::enable_backtrace(32);
+
+	auto stdout_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+	stdout_sink->set_level(spdlog::level::info);
+	stdout_sink->set_pattern("[%^%=9l%$] %v");
+
+	auto file_rotating_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("logs/log.txt", 1048576 * 10, 5);
+	file_rotating_sink->set_level(spdlog::level::trace);
+	file_rotating_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%t] [%^%l%$] %v");
+
+	std::vector<spdlog::sink_ptr> sinks { stdout_sink, file_rotating_sink };
+	auto logger = std::make_shared<spdlog::logger>("default", sinks.begin(), sinks.end());
+	logger->set_level(spdlog::level::trace);
+	// logger->set_level(spdlog::level::debug);
+	spdlog::set_default_logger(logger);
+}
 
 int main()
 {
-	if (!glfwInit())
-	{
-		return -1;
-	}
+	setup_logger();
 
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-
-	int width = 640;
-	int height = 480;
-	GLFWwindow* window = glfwCreateWindow(width, height, "window name", nullptr, nullptr);
-	if (!window)
-	{
-		glfwTerminate();
-		return -1;
-	}
-
-	bgfx::Init init;
-	init.type = bgfx::RendererType::Vulkan;
-
-	// platform specific
-	bool valid_platform = false;
-	switch (glfwGetPlatform())
-	{
-#if defined(__unix__)
-	#if defined(__has_include) && __has_include(<wayland-client.h>)
-		case GLFW_PLATFORM_WAYLAND:
-			init.platformData.nwh = glfwGetWaylandWindow(window);
-			init.platformData.ndt = glfwGetWaylandDisplay();
-			init.platformData.type = bgfx::NativeWindowHandleType::Wayland;
-			valid_platform = true;
-			break;
-	#else
-		case GLFW_PLATFORM_X11:
-			init.platformData.nwh = glfwGetX11Window(window);
-			init.platformData.ndt = glfwGetX11Display();
-			init.platformData.type = bgfx::NativeWindowHandleType::Default;
-			valid_platform = true;
-			break;
-	#endif
-#elif defined(__APPLE__)
-		case GLFW_PLATFORM_COCOA:
-			init.platformData.nwh = glfwGetCocoaWindow(window);
-			valid_platform = true;
-			break;
-#elif defined(_WIN32)
-		case GLFW_PLATFORM_WIN32:
-			init.platformData.nwh = glfwGetWin32Window(window);
-			valid_platform = true;
-			break;
-#endif
-	}
-
-	if (!valid_platform)
-	{
-		return -1;
-	}
-
-	init.resolution.width = width;
-	init.resolution.height = height;
-	init.resolution.reset = BGFX_RESET_NONE;
-
-	if (!bgfx::init(init))
-	{
-		glfwDestroyWindow(window);
-		glfwTerminate();
-		return -1;
-	}
-
-	uint32_t target_fps = 360;
-	uint64_t target_delta_us = 1000000 / target_fps;
-
-	auto start_time = std::chrono::high_resolution_clock::now();
-	auto last_time = start_time;
-
-	uint64_t fps_cooldown_us = 1000000;
-	uint64_t fps_elapsed = 0;
-	uint64_t fps_elapsed_curr = 0;
-	uint32_t frames = 0;
-	int64_t correction = 0;
-	while (!glfwWindowShouldClose(window))
-	{
-		auto frame_start_time = std::chrono::high_resolution_clock::now();
-		uint64_t delta_us = (std::chrono::duration_cast<std::chrono::microseconds>(frame_start_time - last_time)).count();
-		last_time = frame_start_time;
-
-		fps_elapsed += delta_us;
-		fps_elapsed_curr += delta_us;
-		if (fps_elapsed >= fps_cooldown_us)
-		{
-			std::cout << "fps: " << (double)frames / ((double)fps_elapsed_curr / 1000000.0) << "\n";
-			fps_elapsed -= fps_cooldown_us;
-			fps_elapsed_curr = 0;
-			frames = 0;
-		}
-
-		auto update_start_time = std::chrono::high_resolution_clock::now();
-
-		glfwPollEvents();
-
-		bgfx::setViewRect(0, 0, 0, width, height);
-		bgfx::touch(0);
-		bgfx::frame();
-
-		frames++;
-
-		auto frame_end_time = std::chrono::high_resolution_clock::now();
-
-		correction += target_delta_us - delta_us;
-		correction = std::clamp(correction, -(int64_t)target_delta_us, (int64_t)target_delta_us);
-		uint64_t wait_us = (int64_t)(target_delta_us + correction) < (int64_t)delta_us ? 0 : (target_delta_us - delta_us + correction);
-		std::this_thread::sleep_for(std::chrono::microseconds(wait_us));
-	}
-
-	bgfx::shutdown();
-	glfwDestroyWindow(window);
-	glfwTerminate();
-
+	spdlog::trace("hewwo :3");
+	spdlog::debug("hewwo :3");
+	spdlog::info("hewwo :3");
+	spdlog::warn("hewwo :3");
+	spdlog::error("hewwo :3");
+	spdlog::critical("hewwo :3");
 	return 0;
 }

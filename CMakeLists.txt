@@ -30,6 +30,8 @@ set(BGFX_INSTALL OFF CACHE BOOL "" FORCE)
 add_subdirectory(lib/libevent)
 add_subdirectory(lib/bgfx)
 add_subdirectory(lib/glfw)
+add_subdirectory(lib/spdlog)
+
 target_link_libraries(fluffy_fox
 	PRIVATE
 	event
@@ -39,6 +41,7 @@ target_link_libraries(fluffy_fox
 	pthread
 	bgfx
 	glfw
+	spdlog
 )
 
 target_include_directories(fluffy_fox PUBLIC include lib/doctest)
