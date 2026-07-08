@@ -1,11 +1,13 @@
 # Changelog
 
-## [v0.0.0]
-### Added
-- decided on project title
-- made github project
+## [v0.0.2] 06/07/2026
+- threadpool
+- tcp server
+- tcp client
 
-### Changed
+## [v0.0.1] 04/07/2026
+- custom function types
+- events
 
-### Fixed
-
+## [v0.0.0] 15/07/2025
+- project started

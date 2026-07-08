@@ -1,23 +1,22 @@
 # Game Project
 
 ## General
-- [x] Give name to project
-- [x] Github(s?)
-- [x] Versioning
-- [x] Roadmap
-- [ ] Trello or simillar
+- [x] added events
+- [x] added threadpool
 
-## Graphics engine (Vulkan)
-https://docs.vulkan.org/tutorial/latest/00_Introduction.html
-https://www.youtube.com/watch?v=Y9U9IE0gVHA&list=PL8327DO66nu9qYVKLDmdLW_84-yE4auCR
-https://www.youtube.com/watch?v=da6d28IylL8
-https://www.youtube.com/watch?v=EsEP9iJKBhU&list=PLA0dXqQjCx0RntJy1pqje9uHRF1Z5vZgA&index=1
+## Graphics engine
+- [x] add glfw
+- [x] add bgfx
+- [ ] switch to raw Vulkan
 
-## Networking (TCP + UDP)
+## Networking
+- [x] add libevent
+- [x] tcp server
+- [x] tcp client
 
 ## Game engine
 
-## Audio engine (RT audio)
+## Audio engine
 
 ## Physics engine
 

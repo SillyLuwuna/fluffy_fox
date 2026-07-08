@@ -1,6 +1,7 @@
 #include "events/event.hpp"
 #include "networking/tcp_client.hpp"
 #include "networking/tcp_server.hpp"
+#include <algorithm>
 #include <iostream>
 #include <cstdint>
 
@@ -154,7 +155,6 @@ using namespace fluffy_fox;
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <bgfx/bgfx.h>
-#include <wayland-client.h>
 
 int main()
 {
@@ -167,7 +167,7 @@ int main()
 
 	int width = 640;
 	int height = 480;
-	GLFWwindow* window = glfwCreateWindow(width, height, "test", nullptr, nullptr);
+	GLFWwindow* window = glfwCreateWindow(width, height, "window name", nullptr, nullptr);
 	if (!window)
 	{
 		glfwTerminate();
@@ -217,7 +217,7 @@ int main()
 
 	init.resolution.width = width;
 	init.resolution.height = height;
-	init.resolution.reset = BGFX_RESET_VSYNC;
+	init.resolution.reset = BGFX_RESET_NONE;
 
 	if (!bgfx::init(init))
 	{
@@ -226,13 +226,49 @@ int main()
 		return -1;
 	}
 
+	uint32_t target_fps = 360;
+	uint64_t target_delta_us = 1000000 / target_fps;
+
+	auto start_time = std::chrono::high_resolution_clock::now();
+	auto last_time = start_time;
+
+	uint64_t fps_cooldown_us = 1000000;
+	uint64_t fps_elapsed = 0;
+	uint64_t fps_elapsed_curr = 0;
+	uint32_t frames = 0;
+	int64_t correction = 0;
 	while (!glfwWindowShouldClose(window))
 	{
+		auto frame_start_time = std::chrono::high_resolution_clock::now();
+		uint64_t delta_us = (std::chrono::duration_cast<std::chrono::microseconds>(frame_start_time - last_time)).count();
+		last_time = frame_start_time;
+
+		fps_elapsed += delta_us;
+		fps_elapsed_curr += delta_us;
+		if (fps_elapsed >= fps_cooldown_us)
+		{
+			std::cout << "fps: " << (double)frames / ((double)fps_elapsed_curr / 1000000.0) << "\n";
+			fps_elapsed -= fps_cooldown_us;
+			fps_elapsed_curr = 0;
+			frames = 0;
+		}
+
+		auto update_start_time = std::chrono::high_resolution_clock::now();
+
 		glfwPollEvents();
 
 		bgfx::setViewRect(0, 0, 0, width, height);
 		bgfx::touch(0);
 		bgfx::frame();
+
+		frames++;
+
+		auto frame_end_time = std::chrono::high_resolution_clock::now();
+
+		correction += target_delta_us - delta_us;
+		correction = std::clamp(correction, -(int64_t)target_delta_us, (int64_t)target_delta_us);
+		uint64_t wait_us = (int64_t)(target_delta_us + correction) < (int64_t)delta_us ? 0 : (target_delta_us - delta_us + correction);
+		std::this_thread::sleep_for(std::chrono::microseconds(wait_us));
 	}
 
 	bgfx::shutdown();
