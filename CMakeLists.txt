@@ -31,9 +31,9 @@ add_subdirectory(lib/libevent)
 add_subdirectory(lib/bgfx)
 add_subdirectory(lib/glfw)
 add_subdirectory(lib/spdlog)
+add_subdirectory(lib/hwinfo)
 
-target_link_libraries(fluffy_fox
-	PRIVATE
+target_link_libraries(fluffy_fox PRIVATE
 	event
 	event_core
 	event_extra
@@ -42,7 +42,7 @@ target_link_libraries(fluffy_fox
 	bgfx
 	glfw
 	spdlog
+	hwinfo
 )
 
-target_include_directories(fluffy_fox PUBLIC include lib/doctest)
 target_include_directories(fluffy_fox PUBLIC include)

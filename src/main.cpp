@@ -1,6 +1,7 @@
 #include "events/event.hpp"
 #include "networking/tcp_client.hpp"
 #include "networking/tcp_server.hpp"
+#include "rendering/renderer.hpp"
 #include "spdlog/async.h"
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/sinks/rotating_file_sink.h"
@@ -9,8 +10,10 @@
 #include <algorithm>
 #include <iostream>
 #include <cstdint>
+#include "rendering/window.hpp"
 
 using namespace fluffy_fox;
+using namespace fluffy_fox::rendering;
 // using namespace fluffy_fox::networking;
 
 // TcpServer* srvr = nullptr;
@@ -151,7 +154,7 @@ void setup_logger()
 	spdlog::enable_backtrace(32);
 
 	auto stdout_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-	stdout_sink->set_level(spdlog::level::info);
+	stdout_sink->set_level(spdlog::level::debug);
 	stdout_sink->set_pattern("[%^%=9l%$] %v");
 
 	auto file_rotating_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("logs/log.txt", 1048576 * 10, 5);
@@ -160,20 +163,18 @@ void setup_logger()
 
 	std::vector<spdlog::sink_ptr> sinks { stdout_sink, file_rotating_sink };
 	auto logger = std::make_shared<spdlog::logger>("default", sinks.begin(), sinks.end());
-	logger->set_level(spdlog::level::trace);
-	// logger->set_level(spdlog::level::debug);
+	logger->set_level(spdlog::level::debug);
 	spdlog::set_default_logger(logger);
 }
+
+#include <hwinfo/hwinfo.h>
 
 int main()
 {
 	setup_logger();
 
-	spdlog::trace("hewwo :3");
-	spdlog::debug("hewwo :3");
-	spdlog::info("hewwo :3");
-	spdlog::warn("hewwo :3");
-	spdlog::error("hewwo :3");
-	spdlog::critical("hewwo :3");
+	Window window("owo", 840, 630);
+	Renderer::instance().start(window, RendererType::Vulkan, false, 360);
+
 	return 0;
 }

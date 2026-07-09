@@ -1,131 +1,145 @@
+#if defined(__unix__)
+	#if defined(__has_include) && __has_include(<wayland-client.h>)
+		#define IS_WAYLAND
+		#define GLFW_EXPOSE_NATIVE_WAYLAND
+	#else
+		#define IS_X11
+		#define GLFW_EXPOSE_NATIVE_X11
+	#endif
+#elif defined(_WIN32)
+	#define IS_WINDOWS
+	#define GLFW_EXPOSE_NATIVE_WIN32
+#elif defined(__APPLE__)
+	#define IS_APPLE
+	#define GLFW_EXPOSE_NATIVE_COCOA
+#endif
 
+#include <GLFW/glfw3.h>
+#include <GLFW/glfw3native.h>
 #include "rendering/window.hpp"
+#include "spdlog/spdlog.h"
+#include "rendering/renderer.hpp"
+
+#include <stdexcept>
 
 using namespace fluffy_fox::rendering;
 
-Window::Window()
+Window::Window(const std::string& name, int width, int height) :
+	width_(width),
+	height_(height),
+	window_(nullptr)
 {
-// 	if (!glfwInit())
-// 	{
-// 		// throw std::runtime_error("could not ")
-// 		return -1;
-// 	}
-//
-// 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-//
-// 	int width = 640;
-// 	int height = 480;
-// 	GLFWwindow* window = glfwCreateWindow(width, height, "window name", nullptr, nullptr);
-// 	if (!window)
-// 	{
-// 		glfwTerminate();
-// 		return -1;
-// 	}
-//
-// 	bgfx::Init init;
-// 	init.type = bgfx::RendererType::Vulkan;
-//
-// 	// platform specific
-// 	bool valid_platform = false;
-// 	switch (glfwGetPlatform())
-// 	{
-// #if defined(__unix__)
-// 	#if defined(__has_include) && __has_include(<wayland-client.h>)
-// 		case GLFW_PLATFORM_WAYLAND:
-// 			init.platformData.nwh = glfwGetWaylandWindow(window);
-// 			init.platformData.ndt = glfwGetWaylandDisplay();
-// 			init.platformData.type = bgfx::NativeWindowHandleType::Wayland;
-// 			valid_platform = true;
-// 			break;
-// 	#else
-// 		case GLFW_PLATFORM_X11:
-// 			init.platformData.nwh = glfwGetX11Window(window);
-// 			init.platformData.ndt = glfwGetX11Display();
-// 			init.platformData.type = bgfx::NativeWindowHandleType::Default;
-// 			valid_platform = true;
-// 			break;
-// 	#endif
-// #elif defined(__APPLE__)
-// 		case GLFW_PLATFORM_COCOA:
-// 			init.platformData.nwh = glfwGetCocoaWindow(window);
-// 			valid_platform = true;
-// 			break;
-// #elif defined(_WIN32)
-// 		case GLFW_PLATFORM_WIN32:
-// 			init.platformData.nwh = glfwGetWin32Window(window);
-// 			valid_platform = true;
-// 			break;
-// #endif
-// 	}
-//
-// 	if (!valid_platform)
-// 	{
-// 		return -1;
-// 	}
-//
-// 	init.resolution.width = width;
-// 	init.resolution.height = height;
-// 	init.resolution.reset = BGFX_RESET_NONE;
-//
-// 	if (!bgfx::init(init))
-// 	{
-// 		glfwDestroyWindow(window);
-// 		glfwTerminate();
-// 		return -1;
-// 	}
+	if (Renderer::instance().is_running())
+	{
+		spdlog::critical("glfx does not support multiple instantiations, limiting to one window");
+		throw std::runtime_error("glfx does not support multiple instantiations, limiting to one window");
+	}
+
+	if (!glfwInit())
+	{
+		spdlog::critical("could not initialize glfw");
+		throw std::runtime_error("could not initialize glfw");
+	}
+
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
+	window_ = glfwCreateWindow(width, height, name.c_str(), nullptr, nullptr);
+	if (!window_)
+	{
+		glfwTerminate();
+		spdlog::critical("could not create window");
+		throw std::runtime_error("could not create window");
+	}
 }
 
 Window::~Window()
 {
-	// bgfx::shutdown();
-	// glfwDestroyWindow(window);
-	// glfwTerminate();
+	Renderer::instance().stop();
+	glfwDestroyWindow(window_);
+	glfwTerminate();
 }
 
-void Window::event_loop()
+void Window::start_event_loop()
 {
-	// uint32_t target_fps = 360;
-	// uint64_t target_delta_us = 1000000 / target_fps;
-	//
-	// auto start_time = std::chrono::high_resolution_clock::now();
-	// auto last_time = start_time;
-	//
-	// uint64_t fps_cooldown_us = 1000000;
-	// uint64_t fps_elapsed = 0;
-	// uint64_t fps_elapsed_curr = 0;
-	// uint32_t frames = 0;
-	// int64_t correction = 0;
-	// while (!glfwWindowShouldClose(window))
-	// {
-	// 	auto frame_start_time = std::chrono::high_resolution_clock::now();
-	// 	uint64_t delta_us = (std::chrono::duration_cast<std::chrono::microseconds>(frame_start_time - last_time)).count();
-	// 	last_time = frame_start_time;
-	//
-	// 	fps_elapsed += delta_us;
-	// 	fps_elapsed_curr += delta_us;
-	// 	if (fps_elapsed >= fps_cooldown_us)
-	// 	{
-	// 		std::cout << "fps: " << (double)frames / ((double)fps_elapsed_curr / 1000000.0) << "\n";
-	// 		fps_elapsed -= fps_cooldown_us;
-	// 		fps_elapsed_curr = 0;
-	// 		frames = 0;
-	// 	}
-	//
-	// 	auto update_start_time = std::chrono::high_resolution_clock::now();
-	//
-	// 	glfwPollEvents();
-	//
-	// 	bgfx::setViewRect(0, 0, 0, width, height);
-	// 	bgfx::touch(0);
-	// 	bgfx::frame();
-	//
-	// 	frames++;
-	//
-	// 	auto frame_end_time = std::chrono::high_resolution_clock::now();
-	//
-	// 	correction += target_delta_us - delta_us;
-	// 	correction = std::clamp(correction, -(int64_t)target_delta_us, (int64_t)target_delta_us);
-	// 	uint64_t wait_us = (int64_t)(target_delta_us + correction) < (int64_t)delta_us ? 0 : (target_delta_us - delta_us + correction);
-	// 	std::this_thread::sleep_for(std::chrono::microseconds(wait_us));
-	// }
+	if (!Renderer::instance().is_running())
+	{
+		spdlog::error("cannot execute event loop without renderer running");
+		throw std::runtime_error("cannot execute event loop without renderer running");
+	}
+
+	Renderer& renderer = Renderer::instance();
+	while (!glfwWindowShouldClose(window_) && renderer.is_running())
+	{
+		glfwPollEvents();
+		renderer.render_frame(); //TODO should probably be calling something else
+	}
+	spdlog::info("closing window");
+}
+
+void* Window::get_platform_window() const
+{
+	switch (glfwGetPlatform())
+	{
+#if defined(IS_WAYLAND)
+		case GLFW_PLATFORM_WAYLAND:
+			return glfwGetWaylandWindow(window_);
+			break;
+#elif defined(IS_X11)
+		case GLFW_PLATFORM_X11:
+			return glfwGetX11Window(window_);
+			break;
+#elif defined(IS_APPLE)
+		case GLFW_PLATFORM_COCOA:
+			return glfwGetCocoaWindow(window_);
+			break;
+#elif defined(IS_WINDOWS)
+		case GLFW_PLATFORM_WIN32:
+			return glfwGetWin32Window(window_);
+			break;
+#endif
+	}
+
+	return nullptr;
+}
+
+void* Window::get_platform_display() const
+{
+	switch (glfwGetPlatform())
+	{
+#if defined(IS_WAYLAND)
+		case GLFW_PLATFORM_WAYLAND:
+			return glfwGetWaylandDisplay();
+			break;
+#elif defined(IS_X11)
+		case GLFW_PLATFORM_X11:
+			return glfwGetX11Display();
+			break;
+#endif
+	}
+
+	return nullptr;
+}
+
+bool Window::is_wayland() const
+{
+#if defined(IS_WAYLAND)
+	return true;
+#else
+	return false;
+#endif
+}
+
+GLFWwindow* Window::get_handle() const
+{
+	return window_;
+}
+
+uint16_t Window::width() const
+{
+	return width_;
+}
+
+uint16_t Window::height() const
+{
+	return height_;
 }

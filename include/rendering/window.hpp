@@ -1,26 +1,17 @@
-#pragma once
-
-#if defined(__unix__)
-	#if defined(__has_include) && __has_include(<wayland-client.h>)
-		#define GLFW_EXPOSE_NATIVE_WAYLAND
-	#else
-		#define GLFW_EXPOSE_NATIVE_X11
-	#endif
-#elif defined(_WIN32)
-	#define GLFW_EXPOSE_NATIVE_WIN32
-#elif defined(__APPLE__)
-	#define GLFW_EXPOSE_NATIVE_COCOA
-#endif
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
-#include <bgfx/bgfx.h>
+#include <string>
 
 namespace fluffy_fox::rendering
 {
+	class Renderer;
+
 	class Window
 	{
 	private:
-		void event_loop();
+		uint16_t width_;
+		uint16_t height_;
+		GLFWwindow* window_;
 
 	public:
 		Window(const Window&) = delete;
@@ -28,7 +19,17 @@ namespace fluffy_fox::rendering
 		Window& operator=(const Window&) = delete;
 		Window& operator=(Window&&) = delete;
 
-		Window();
+		Window(const std::string& name, int width, int height);
 		~Window();
+
+		GLFWwindow* get_handle() const;
+		uint16_t width() const;
+		uint16_t height() const;
+
+		void* get_platform_window() const;
+		void* get_platform_display() const;
+		bool is_wayland() const;
+
+		void start_event_loop();
 	};
 }

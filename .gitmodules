@@ -10,3 +10,6 @@
 [submodule "lib/spdlog"]
 	path = lib/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "lib/hwinfo"]
+	path = lib/hwinfo
+	url = https://github.com/lfreist/hwinfo.git
