@@ -1,6 +1,7 @@
 #include "rendering/renderer.hpp"
 #include "rendering/window.hpp"
 #include "spdlog/spdlog.h"
+#include <iostream>
 
 using namespace fluffy_fox::rendering;
 
@@ -57,6 +58,7 @@ bool Renderer::start(Window& window, RendererType type, bool vsync, uint16_t max
 
 	running_ = true;
 
+	window_->attach_renderer(*this);
 	// FIXME doesn't return true, blocks
 	window_->start_event_loop();
 	return true;
@@ -217,6 +219,9 @@ void Renderer::stop()
 	if (!running_) return;
 
 	bgfx::shutdown();
+
+	running_ = false;
+	window_->detach_renderer();
 }
 
 bool Renderer::restart()

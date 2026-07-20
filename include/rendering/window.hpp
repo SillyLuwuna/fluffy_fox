@@ -12,6 +12,7 @@ namespace fluffy_fox::rendering
 		uint16_t width_;
 		uint16_t height_;
 		GLFWwindow* window_;
+		Renderer* attached_renderer_;
 
 	public:
 		Window(const Window&) = delete;
@@ -31,5 +32,7 @@ namespace fluffy_fox::rendering
 		bool is_wayland() const;
 
 		void start_event_loop();
+		void attach_renderer(Renderer& renderer);
+		void detach_renderer();
 	};
 }

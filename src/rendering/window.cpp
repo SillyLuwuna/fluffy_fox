@@ -1,3 +1,4 @@
+#include <iostream>
 #if defined(__unix__)
 	#if defined(__has_include) && __has_include(<wayland-client.h>)
 		#define IS_WAYLAND
@@ -27,7 +28,8 @@ using namespace fluffy_fox::rendering;
 Window::Window(const std::string& name, int width, int height) :
 	width_(width),
 	height_(height),
-	window_(nullptr)
+	window_(nullptr),
+	attached_renderer_(nullptr)
 {
 	if (Renderer::instance().is_running())
 	{
@@ -54,25 +56,34 @@ Window::Window(const std::string& name, int width, int height) :
 
 Window::~Window()
 {
-	Renderer::instance().stop();
+	if (attached_renderer_)
+	{
+		attached_renderer_->stop();
+	}
 	glfwDestroyWindow(window_);
 	glfwTerminate();
 }
 
 void Window::start_event_loop()
 {
-	if (!Renderer::instance().is_running())
+	if (!attached_renderer_)
+	{
+		spdlog::error("cannot execute event loop without an attached renderer");
+		throw std::runtime_error("cannot execute event loop without an attached renderer");
+	}
+
+	if (!attached_renderer_->is_running())
 	{
 		spdlog::error("cannot execute event loop without renderer running");
 		throw std::runtime_error("cannot execute event loop without renderer running");
 	}
 
-	Renderer& renderer = Renderer::instance();
-	while (!glfwWindowShouldClose(window_) && renderer.is_running())
+	while (!glfwWindowShouldClose(window_) && attached_renderer_->is_running())
 	{
 		glfwPollEvents();
-		renderer.render_frame(); //TODO should probably be calling something else
+		attached_renderer_->render_frame(); //TODO should probably be calling something else
 	}
+
 	spdlog::info("closing window");
 }
 
@@ -142,4 +153,14 @@ uint16_t Window::width() const
 uint16_t Window::height() const
 {
 	return height_;
+}
+
+void Window::attach_renderer(Renderer& renderer)
+{
+	attached_renderer_ = &renderer;
+}
+
+void Window::detach_renderer()
+{
+	attached_renderer_ = nullptr;
 }

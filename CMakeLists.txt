@@ -14,7 +14,7 @@ target_compile_options(fluffy_fox PRIVATE
 	-Wall
 	-Wextra
 	-Wpedantic
-	-O2
+	-O3
 )
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
