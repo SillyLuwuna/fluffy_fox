@@ -13,3 +13,12 @@
 [submodule "lib/hwinfo"]
 	path = third_party/hwinfo
 	url = https://github.com/lfreist/hwinfo.git
+[submodule "third_party/tinygltf"]
+	path = third_party/tinygltf
+	url = https://github.com/syoyo/tinygltf.git
+[submodule "third_party/glm"]
+	path = third_party/glm
+	url = https://github.com/g-truc/glm.git
+[submodule "third_party/stb"]
+	path = third_party/stb
+	url = https://github.com/nothings/stb.git

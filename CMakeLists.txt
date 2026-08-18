@@ -48,6 +48,8 @@ add_subdirectory(${THIRD_PARTY_DIR}/bgfx)
 add_subdirectory(${THIRD_PARTY_DIR}/glfw)
 add_subdirectory(${THIRD_PARTY_DIR}/spdlog)
 add_subdirectory(${THIRD_PARTY_DIR}/hwinfo)
+add_subdirectory(${THIRD_PARTY_DIR}/tinygltf)
+add_subdirectory(${THIRD_PARTY_DIR}/glm)
 
 # # libevent bugfix on newer gcc versions
 get_property(libevent_targets DIRECTORY ${THIRD_PARTY_DIR}/libevent PROPERTY BUILDSYSTEM_TARGETS)
@@ -63,6 +65,9 @@ foreach(tgt ${libevent_targets})
     endif()
 endforeach()
 
+add_library(stb INTERFACE)
+target_include_directories(stb INTERFACE ${THIRD_PARTY_DIR}/stb)
+
 target_link_libraries(${LIB} PUBLIC
 	event
 	event_core
@@ -73,6 +78,7 @@ target_link_libraries(${LIB} PUBLIC
 	glfw
 	spdlog
 	hwinfo
+	stb
 )
 
 add_executable(${BIN} ${MAIN})
