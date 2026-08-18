@@ -1,15 +1,15 @@
 [submodule "lib/libevent"]
-	path = lib/libevent
+	path = third_party/libevent
 	url = https://github.com/libevent/libevent.git
 [submodule "lib/bgfx"]
-	path = lib/bgfx
+	path = third_party/bgfx
 	url = https://github.com/bkaradzic/bgfx.cmake.git
 [submodule "lib/glfw"]
-	path = lib/glfw
+	path = third_party/glfw
 	url = https://github.com/glfw/glfw.git
 [submodule "lib/spdlog"]
-	path = lib/spdlog
+	path = third_party/spdlog
 	url = https://github.com/gabime/spdlog.git
 [submodule "lib/hwinfo"]
-	path = lib/hwinfo
+	path = third_party/hwinfo
 	url = https://github.com/lfreist/hwinfo.git

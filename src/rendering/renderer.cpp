@@ -100,7 +100,7 @@ void Renderer::init_set_renderer(RendererType renderer)
 
 void Renderer::init_set_gpu(int8_t gpu_id)
 {
-	// DOESN'T WORK
+	// FIXME DOESN'T WORK
 	if (gpu_id < 0)
 	{
 		init_set_gpu_default();

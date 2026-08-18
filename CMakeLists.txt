@@ -27,11 +27,11 @@ set(BGFX_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
 set(BGFX_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BGFX_INSTALL OFF CACHE BOOL "" FORCE)
 
-add_subdirectory(lib/libevent)
-add_subdirectory(lib/bgfx)
-add_subdirectory(lib/glfw)
-add_subdirectory(lib/spdlog)
-add_subdirectory(lib/hwinfo)
+add_subdirectory(third_party/libevent)
+add_subdirectory(third_party/bgfx)
+add_subdirectory(third_party/glfw)
+add_subdirectory(third_party/spdlog)
+add_subdirectory(third_party/hwinfo)
 
 target_link_libraries(fluffy_fox PRIVATE
 	event
