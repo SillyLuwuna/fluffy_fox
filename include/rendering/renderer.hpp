@@ -5,6 +5,7 @@
 #include <bgfx/bgfx.h>
 #include <string>
 #include <vector>
+#include <shaderc/shaderc.hpp>
 
 // #include "window.hpp"
 #include "gpu.hpp"
@@ -62,6 +63,8 @@ namespace fluffy_fox::rendering
 		void init_set_gpu(int8_t gpu_id);
 		void init_set_gpu_default();
 		bool restart();
+
+		// static bgfx::ShaderHandle load_shader(const std::string& path);
 
 	public:
 		~Renderer();

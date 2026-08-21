@@ -238,7 +238,7 @@ bool Renderer::restart()
 void Renderer::render_frame()
 {
 	auto frame_start_time = std::chrono::high_resolution_clock::now();
-	uint64_t delta_us = (std::chrono::duration_cast<std::chrono::microseconds>(frame_start_time - last_frame_time_)).count();
+	uint64_t delta_us = std::chrono::duration_cast<std::chrono::microseconds>(frame_start_time - last_frame_time_).count();
 	last_frame_time_ = frame_start_time;
 
 	// call update with delta time
@@ -247,7 +247,7 @@ void Renderer::render_frame()
 	stat_fps_elapsed_curr_ += delta_us;
 	if (stat_fps_elapsed_ >= stat_fps_cooldown_us_)
 	{
-		spdlog::info("fps: {:.2f}", ((double)frames_ / ((double)stat_fps_elapsed_curr_ / 1000000.0)));
+		spdlog::info("fps: {:.2f}", (double)frames_ / ((double)stat_fps_elapsed_curr_ / 1000000.0));
 		stat_fps_elapsed_ -= stat_fps_cooldown_us_;
 		stat_fps_elapsed_curr_ = 0;
 		frames_ = 0;
