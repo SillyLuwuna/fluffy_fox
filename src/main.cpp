@@ -7,10 +7,13 @@
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
+// #include <hwinfo/hwinfo.h>
 #include <algorithm>
 #include <iostream>
 #include <cstdint>
 #include "rendering/window.hpp"
+#include "rendering/vulkan_tutorial.hpp"
+
 
 using namespace fluffy_fox;
 using namespace fluffy_fox::rendering;
@@ -167,14 +170,23 @@ void setup_logger()
 	spdlog::set_default_logger(logger);
 }
 
-#include <hwinfo/hwinfo.h>
-
 int main()
 {
 	setup_logger();
 
-	Window window("owo", 840, 630);
-	Renderer::instance().start(window, RendererType::Vulkan, false, 360);
+	// Window window("owo", 840, 630);
+	// Renderer::instance().start(window, RendererType::Vulkan, false, 360);
+
+	try
+	{
+		VulkanTutorial app;
+		app.run();
+	}
+	catch (const std::exception& e)
+	{
+		std::cerr << e.what() << std::endl;
+		return 1;
+	}
 
 	return 0;
 }

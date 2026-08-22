@@ -31,11 +31,11 @@ Window::Window(const std::string& name, int width, int height) :
 	window_(nullptr),
 	attached_renderer_(nullptr)
 {
-	if (Renderer::instance().is_running())
-	{
-		spdlog::critical("glfx does not support multiple instantiations, limiting to one window");
-		throw std::runtime_error("glfx does not support multiple instantiations, limiting to one window");
-	}
+	// if (Renderer::instance().is_running())
+	// {
+	// 	spdlog::critical("glfx does not support multiple instantiations, limiting to one window");
+	// 	throw std::runtime_error("glfx does not support multiple instantiations, limiting to one window");
+	// }
 
 	if (!glfwInit())
 	{
@@ -56,10 +56,10 @@ Window::Window(const std::string& name, int width, int height) :
 
 Window::~Window()
 {
-	if (attached_renderer_)
-	{
-		attached_renderer_->stop();
-	}
+	// if (attached_renderer_)
+	// {
+	// 	attached_renderer_->stop();
+	// }
 	glfwDestroyWindow(window_);
 	glfwTerminate();
 }
@@ -72,16 +72,20 @@ void Window::start_event_loop()
 		throw std::runtime_error("cannot execute event loop without an attached renderer");
 	}
 
-	if (!attached_renderer_->is_running())
-	{
-		spdlog::error("cannot execute event loop without renderer running");
-		throw std::runtime_error("cannot execute event loop without renderer running");
-	}
+	// if (!attached_renderer_->is_running())
+	// {
+	// 	spdlog::error("cannot execute event loop without renderer running");
+	// 	throw std::runtime_error("cannot execute event loop without renderer running");
+	// }
 
-	while (!glfwWindowShouldClose(window_) && attached_renderer_->is_running())
+	// while (!glfwWindowShouldClose(window_) && attached_renderer_->is_running())
+	// {
+	// 	glfwPollEvents();
+	// 	attached_renderer_->render_frame(); //TODO should probably be calling something else
+	// }
+	while (!glfwWindowShouldClose(window_))
 	{
 		glfwPollEvents();
-		attached_renderer_->render_frame(); //TODO should probably be calling something else
 	}
 
 	spdlog::info("closing window");

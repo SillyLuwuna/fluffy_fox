@@ -22,6 +22,8 @@ set(TEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${TEST_DIR})
 
 project(${PROJECT})
 
+find_package (Vulkan REQUIRED)
+
 file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS ${SRC_DIR}/*.cpp)
 list(FILTER SRC_FILES EXCLUDE REGEX ".*${MAIN}$")
 file(GLOB_RECURSE INCLUDE_FILES CONFIGURE_DEPENDS ${INCLUDE_DIR}/*.hpp)
@@ -30,7 +32,7 @@ set_target_properties(${LIB} PROPERTIES LINKER_LANGUAGE CXX)
 
 target_include_directories(${LIB} PUBLIC ${INCLUDE_DIR})
 
-target_compile_definitions(${LIB} PRIVATE $<$<CONFIG:Debug>:DEBUG>)
+target_compile_definitions(${LIB} PUBLIC $<$<CONFIG:Debug>:DEBUG>)
 
 set(BUILD_SHARED_LIBS OFF)
 
@@ -47,12 +49,17 @@ set(BGFX_INSTALL OFF CACHE BOOL "" FORCE)
 
 set(EVENT__LIBRARY_TYPE "STATIC" CACHE STRING "" FORCE)
 
+target_compile_definitions(${LIB} INTERFACE
+	VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1
+	VULKAN_HPP_NO_STRUCT_CONSTRUCTORS=1
+)
+
 # libraries
 add_subdirectory(${THIRD_PARTY_DIR}/libevent)
-add_subdirectory(${THIRD_PARTY_DIR}/bgfx)
+# add_subdirectory(${THIRD_PARTY_DIR}/bgfx)
 add_subdirectory(${THIRD_PARTY_DIR}/glfw)
 add_subdirectory(${THIRD_PARTY_DIR}/spdlog)
-add_subdirectory(${THIRD_PARTY_DIR}/hwinfo)
+# add_subdirectory(${THIRD_PARTY_DIR}/hwinfo)
 add_subdirectory(${THIRD_PARTY_DIR}/tinygltf)
 add_subdirectory(${THIRD_PARTY_DIR}/glm)
 
@@ -79,26 +86,27 @@ target_link_libraries(${LIB} PUBLIC
 	event_extra
 	event_pthreads
 	pthread
-	bgfx
+#	bgfx
+	Vulkan::Vulkan
 	glfw
 	spdlog
-	hwinfo
+#	hwinfo
 	stb
 )
 
 # shaders
-file(
-	COPY ${THIRD_PARTY_DIR}/bgfx/bgfx/src/bgfx_shader.sh
-	DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER_DIR}
-)
-file(GLOB_RECURSE SHADERS CONFIGURE_DEPENDS ${SHADER_DIR}/*.sc)
-include(${THIRD_PARTY_DIR}/bgfx/cmake/bgfxToolUtils.cmake)
-bgfx_compile_shaders(
-	TYPE VERTEX
-	SHADERS ${SHADER_DIR}/vs_basic.sc
-	VARYING_DEF ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER_DIR}/varying.def.sc
-	OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/${SHADER_DIR}
-)
+# file(
+# 	COPY ${THIRD_PARTY_DIR}/bgfx/bgfx/src/bgfx_shader.sh
+# 	DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER_DIR}
+# )
+# file(GLOB_RECURSE SHADERS CONFIGURE_DEPENDS ${SHADER_DIR}/*.sc)
+# include(${THIRD_PARTY_DIR}/bgfx/cmake/bgfxToolUtils.cmake)
+# bgfx_compile_shaders(
+# 	TYPE VERTEX
+# 	SHADERS ${SHADER_DIR}/vs_basic.sc
+# 	VARYING_DEF ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER_DIR}/varying.def.sc
+# 	OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/${SHADER_DIR}
+# )
 
 # executable
 add_executable(${BIN} ${MAIN} ${SHADERS})
@@ -109,7 +117,7 @@ target_compile_options(${BIN} PRIVATE
 	-Wall
 	-Wextra
 	-Wpedantic
-	-O3
+	-O2
 )
 
 # tests
