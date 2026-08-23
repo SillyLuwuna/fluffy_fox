@@ -9,6 +9,8 @@
 constexpr uint32_t WIDTH = 800;
 constexpr uint32_t HEIGHT = 600;
 
+constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
+
 const std::vector<char const*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
 };
@@ -25,7 +27,6 @@ namespace fluffy_fox::rendering
 	{
 	private:
 		Window& window;
-		// GLFWwindow* window = nullptr;
 		vk::raii::Context context;
 		vk::raii::Instance instance = nullptr;
 		vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
@@ -42,36 +43,14 @@ namespace fluffy_fox::rendering
 		vk::raii::PipelineLayout pipelineLayout = nullptr;
 		vk::raii::Pipeline graphicsPipeline = nullptr;
 		vk::raii::CommandPool commandPool = nullptr;
-		vk::raii::CommandBuffer commandBuffer = nullptr;
 
-		vk::raii::Semaphore presentCompleteSemaphore = nullptr;
-		vk::raii::Semaphore renderFinishedSemaphore = nullptr;
-		vk::raii::Fence drawFence = nullptr;
+		std::vector<vk::raii::CommandBuffer> commandBuffers;
+		std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
+		std::vector<vk::raii::Semaphore> renderFinishedSemaphores;
+		std::vector<vk::raii::Fence> inFlightFences;
+		uint32_t frameIndex = 0;
 
-		void initWindow()
-		{
-			glfwInit(); // TODO test for errors
-
-			glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-			glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
-			// window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
-		}
-
-		void initVulkan()
-		{
-			createInstance();
-			setupDebugMessenger();
-			createSurface();
-			pickPhysicalDevice();
-			createLogicalDevice();
-			createSwapChain();
-			createImageViews();
-			createGraphicsPipeline();
-			createCommandPool();
-			createCommandBuffer();
-			createSyncObjects();
-		}
+		bool framebufferResized = false;
 
 		static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(
 			vk::DebugUtilsMessageSeverityFlagBitsEXT, // severity
@@ -82,6 +61,11 @@ namespace fluffy_fox::rendering
 		{
 			std::cerr << "validation layer: type " << to_string(type) << " msg: " << pCallbackData->pMessage << std::endl;
 			return vk::False;
+		}
+
+		void setWindowSettings()
+		{
+			window.resize_event().subscribe(&VulkanTutorial::framebufferResizeCallback, this);
 		}
 
 		void setupDebugMessenger()
@@ -600,22 +584,24 @@ namespace fluffy_fox::rendering
 			commandPool = vk::raii::CommandPool(device, poolInfo);
 		}
 
-		void createCommandBuffer()
+		void createCommandBuffers()
 		{
 			vk::CommandBufferAllocateInfo allocInfo {
 				.commandPool = commandPool,
 				.level = vk::CommandBufferLevel::ePrimary,
-				.commandBufferCount = 1
+				.commandBufferCount = MAX_FRAMES_IN_FLIGHT
 			};
-			commandBuffer = std::move(vk::raii::CommandBuffers(device, allocInfo).front());
+			commandBuffers = vk::raii::CommandBuffers(device, allocInfo);
+			// commandBuffer = std::move(vk::raii::CommandBuffers(device, allocInfo).front());
 		}
 
-		void recordCommandBuffer(uint32_t imageIndex)
+		void recordCommandBuffer(vk::raii::CommandBuffer& commandBuffer, uint32_t imageIndex)
 		{
 			vk::CommandBufferBeginInfo beginInfo {};
 			commandBuffer.begin(beginInfo);
 
 			transition_image_layout(
+				commandBuffer,
 				imageIndex,
 				vk::ImageLayout::eUndefined,
 				vk::ImageLayout::eColorAttachmentOptimal,
@@ -672,6 +658,7 @@ namespace fluffy_fox::rendering
 			// TODO needs synchronization here?
 
 			transition_image_layout(
+				commandBuffer,
 				imageIndex,
 				vk::ImageLayout::eColorAttachmentOptimal,
 				vk::ImageLayout::ePresentSrcKHR,
@@ -685,6 +672,7 @@ namespace fluffy_fox::rendering
 		}
 
 		void transition_image_layout(
+			vk::raii::CommandBuffer& commandBuffer,
 			uint32_t imageIndex,
 			vk::ImageLayout old_layout,
 			vk::ImageLayout new_layout,
@@ -724,9 +712,18 @@ namespace fluffy_fox::rendering
 
 		void createSyncObjects()
 		{
-			presentCompleteSemaphore = vk::raii::Semaphore(device, vk::SemaphoreCreateInfo());
-			renderFinishedSemaphore = vk::raii::Semaphore(device, vk::SemaphoreCreateInfo());
-			drawFence = vk::raii::Fence(device, {.flags = vk::FenceCreateFlagBits::eSignaled});
+			assert(presentCompleteSemaphores.empty() && renderFinishedSemaphores.empty() && inFlightFences.empty());
+
+			for (size_t i = 0; i < swapChainImages.size(); i++)
+			{
+				renderFinishedSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
+			}
+
+			for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+			{
+				presentCompleteSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
+				inFlightFences.emplace_back(device, vk::FenceCreateInfo{.flags = vk::FenceCreateFlagBits::eSignaled});
+			}
 		}
 
 		void mainLoop()
@@ -742,51 +739,112 @@ namespace fluffy_fox::rendering
 
 		void drawFrame()
 		{
-			auto fenceResult = device.waitForFences(*drawFence, true, std::numeric_limits<uint64_t>::max());
+			auto fenceResult = device.waitForFences(*inFlightFences[frameIndex], true, std::numeric_limits<uint64_t>::max());
 			if (fenceResult != vk::Result::eSuccess)
 			{
 				throw std::runtime_error("failted to wait for fence!");
 			}
-			device.resetFences(*drawFence);
 
-			auto [result, imageIndex] = swapChain.acquireNextImage(std::numeric_limits<uint64_t>::max(), *presentCompleteSemaphore, nullptr); // TODO error handling
+			auto [result, imageIndex] = swapChain.acquireNextImage(std::numeric_limits<uint64_t>::max(), *presentCompleteSemaphores[frameIndex], nullptr);
 
-			recordCommandBuffer(imageIndex);
+			if (result == vk::Result::eErrorOutOfDateKHR)
+			{
+				std::cout << "changed!\n";
+				recreateSwapChain();
+				return;
+			}
+			if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
+			{
+				assert(result == vk::Result::eTimeout || result == vk::Result::eNotReady);
+				throw std::runtime_error("failed to acquire swapchain image!");
+			}
 
-			graphicsQueue.waitIdle();
+			device.resetFences(*inFlightFences[frameIndex]);
+
+			commandBuffers[frameIndex].reset();
+			recordCommandBuffer(commandBuffers[frameIndex], imageIndex);
 
 			vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
 			const vk::SubmitInfo submitInfo {
 				.waitSemaphoreCount = 1,
-				.pWaitSemaphores = &*presentCompleteSemaphore,
+				.pWaitSemaphores = &*presentCompleteSemaphores[frameIndex],
 				.pWaitDstStageMask = &waitDestinationStageMask,
 				.commandBufferCount = 1,
-				.pCommandBuffers = &*commandBuffer,
+				.pCommandBuffers = &*commandBuffers[frameIndex],
 				.signalSemaphoreCount = 1,
-				.pSignalSemaphores = &*renderFinishedSemaphore
+				.pSignalSemaphores = &*renderFinishedSemaphores[imageIndex]
 			};
 
-			graphicsQueue.submit(submitInfo, *drawFence); // TODO error handling
+			graphicsQueue.submit(submitInfo, *inFlightFences[frameIndex]); // TODO error handling
 
 			const vk::PresentInfoKHR presentInfoKHR {
 				.waitSemaphoreCount = 1,
-				.pWaitSemaphores = &*renderFinishedSemaphore,
+				.pWaitSemaphores = &*renderFinishedSemaphores[imageIndex],
 				.swapchainCount = 1,
 				.pSwapchains = &*swapChain,
 				.pImageIndices = &imageIndex,
 				.pResults = nullptr
 			};
 
-			result = graphicsQueue.presentKHR(presentInfoKHR); // TODO error handling
+			result = graphicsQueue.presentKHR(presentInfoKHR);
+			if ((result == vk::Result::eSuboptimalKHR) || (result == vk::Result::eErrorOutOfDateKHR) || framebufferResized)
+			{
+				std::cout << "changed!\n";
+				framebufferResized = false;
+				recreateSwapChain();
+			}
+			else
+			{
+				assert(result == vk::Result::eSuccess);
+			}
+
+			frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+		}
+
+		void cleanupSwapChain()
+		{
+			swapChainImageViews.clear();
+			swapChain = nullptr;
+		}
+
+		void recreateSwapChain()
+		{
+			window.block_while_minimized();
+
+			// slow, instead of waiting, just pass the old swapchain as oldSwapchain in the new swapchain
+			// and destroy the old swapchain as soon as we're finished using it
+			device.waitIdle();
+
+			cleanupSwapChain();
+
+			createSwapChain();
+			createImageViews();
 		}
 
 	public:
-		VulkanTutorial(Window& window) : window(window) { }
+		VulkanTutorial(Window& window) : window(window)
+		{
+			setWindowSettings();
+			createInstance();
+			setupDebugMessenger();
+			createSurface();
+			pickPhysicalDevice();
+			createLogicalDevice();
+			createSwapChain();
+			createImageViews();
+			createGraphicsPipeline();
+			createCommandPool();
+			createCommandBuffers();
+			createSyncObjects();
+		}
+
+		void framebufferResizeCallback(int , int )
+		{
+			framebufferResized = true;
+		}
 
 		void run()
 		{
-			initWindow();
-			initVulkan();
 			mainLoop();
 		}
 	};

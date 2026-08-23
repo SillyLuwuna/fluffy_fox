@@ -1,5 +1,6 @@
 #pragma once
 
+#include "events/event.hpp"
 #include <GLFW/glfw3.h>
 // #include <GLFW/glfw3native.h>
 #include <string>
@@ -15,6 +16,9 @@ namespace fluffy_fox::rendering
 		uint16_t height_;
 		GLFWwindow* window_;
 		Renderer* attached_renderer_;
+		Event<int32_t, int32_t> resize_event_;
+
+		static void resize_callback(GLFWwindow* window, int32_t width, int32_t height);
 
 	public:
 		Window(const Window&) = delete;
@@ -36,5 +40,9 @@ namespace fluffy_fox::rendering
 		void start_event_loop();
 		void attach_renderer(Renderer& renderer);
 		void detach_renderer();
+
+		Event<int32_t, int32_t>& resize_event();
+
+		void block_while_minimized();
 	};
 }

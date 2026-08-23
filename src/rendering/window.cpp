@@ -52,6 +52,15 @@ Window::Window(const std::string& name, int width, int height) :
 		spdlog::critical("could not create window");
 		throw std::runtime_error("could not create window");
 	}
+
+	glfwSetWindowUserPointer(window_, this);
+	glfwSetFramebufferSizeCallback(window_, resize_callback);
+}
+
+void Window::resize_callback(GLFWwindow* window, int32_t width, int32_t height)
+{
+	Window* obj = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
+	obj->resize_event_.invoke(width, height);
 }
 
 Window::~Window()
@@ -167,4 +176,23 @@ void Window::attach_renderer(Renderer& renderer)
 void Window::detach_renderer()
 {
 	attached_renderer_ = nullptr;
+}
+
+fluffy_fox::Event<int32_t, int32_t>& Window::resize_event()
+{
+	return resize_event_;
+}
+
+void Window::block_while_minimized()
+{
+	int width = 0;
+	int height = 0;
+	glfwGetFramebufferSize(window_, &width, &height);
+
+	while (width == 0 || height == 0)
+	{
+		std::cout << "owo\n";
+		glfwWaitEvents();
+		glfwGetFramebufferSize(window_, &width, &height);
+	}
 }
