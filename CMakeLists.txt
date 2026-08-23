@@ -13,6 +13,7 @@ set(TEST_DIR "test")
 set(INCLUDE_DIR "include")
 set(THIRD_PARTY_DIR "third_party")
 set(SHADER_DIR "shaders")
+set(SLANGC_EXECUTABLE "/home/luna/Documents/binaries/vulkan_lunarg_sdk/x86_64/bin/slangc")
 
 # project settings and files
 option(BUILD_TESTS "Build tests" OFF)
@@ -96,6 +97,30 @@ target_link_libraries(${LIB} PUBLIC
 )
 
 # shaders
+
+function (add_slang_shader_target TARGET)
+	cmake_parse_arguments ("SHADER" "" "" "SOURCES" ${ARGN})
+	set (SHADERS_DIR ${CMAKE_CURRENT_LIST_DIR}/shaders)
+	set (ENTRY_POINTS -entry vertMain -entry fragMain)
+	add_custom_command (
+		OUTPUT ${SHADERS_DIR}
+		COMMAND ${CMAKE_COMMAND} -E make_directory ${SHADERS_DIR}
+	)
+	add_custom_command (
+		OUTPUT ${SHADERS_DIR}/slang.spv
+		COMMAND ${SLANGC_EXECUTABLE} ${SHADER_SOURCES} -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name ${ENTRY_POINTS} -o slang.spv
+		WORKING_DIRECTORY ${SHADERS_DIR}
+		DEPENDS ${SHADERS_DIR} ${SHADER_SOURCES}
+		COMMENT "Compiling Slang Shaders"
+		VERBATIM
+	)
+	add_custom_target(${TARGET} DEPENDS ${SHADERS_DIR}/slang.spv)
+endfunction()
+
+file(GLOB_RECURSE SHADER_SLANG_SOURCES CONFIGURE_DEPENDS ${SHADER_DIR}/*.slang)
+add_slang_shader_target(SHADERS SOURCES ${SHADER_SLANG_SOURCES})
+add_dependencies(${LIB} SHADERS)
+
 # file(
 # 	COPY ${THIRD_PARTY_DIR}/bgfx/bgfx/src/bgfx_shader.sh
 # 	DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER_DIR}

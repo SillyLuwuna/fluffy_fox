@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vulkan/vulkan_raii.hpp>
 #include <GLFW/glfw3.h>
+#include <fstream>
 
 constexpr uint32_t WIDTH = 800;
 constexpr uint32_t HEIGHT = 600;
@@ -31,6 +32,10 @@ private:
 	vk::raii::SwapchainKHR swapChain = nullptr;
 	std::vector<vk::Image> swapChainImages;
 	std::vector<vk::raii::ImageView> swapChainImageViews;
+	vk::raii::PipelineLayout pipelineLayout = nullptr;
+	vk::raii::Pipeline graphicsPipeline = nullptr;
+	vk::raii::CommandPool commandPool = nullptr;
+	uint32_t queueIndex;
 
 	void initWindow()
 	{
@@ -51,6 +56,8 @@ private:
 		createLogicalDevice();
 		createSwapChain();
 		createImageViews();
+		createGraphicsPipeline();
+		createCommandPool();
 	}
 
 	static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(
@@ -239,7 +246,7 @@ private:
 	{
 		std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
 
-		uint32_t queueIndex = ~0;
+		queueIndex = ~0;
 		for (uint32_t qfpIndex = 0; qfpIndex < queueFamilyProperties.size(); qfpIndex++)
 		{
 			if ((queueFamilyProperties[qfpIndex].queueFlags & vk::QueueFlagBits::eGraphics) &&
@@ -410,6 +417,173 @@ private:
 			imageViewCreateInfo.image = image;
 			swapChainImageViews.emplace_back(device, imageViewCreateInfo);
 		}
+	}
+
+	void createGraphicsPipeline()
+	{
+		std::vector<char> shaderCode = readFile("shaders/slang.spv");
+		vk::raii::ShaderModule shaderModule = createShaderModule(readFile("shaders/slang.spv"));
+
+		vk::PipelineShaderStageCreateInfo vertShaderStageInfo {
+			.stage = vk::ShaderStageFlagBits::eVertex,
+			.module = shaderModule,
+			.pName = "vertMain",
+			.pSpecializationInfo = nullptr
+		};
+
+		vk::PipelineShaderStageCreateInfo fragShaderStageInfo {
+			.stage = vk::ShaderStageFlagBits::eFragment,
+			.module = shaderModule,
+			.pName = "fragMain",
+			.pSpecializationInfo = nullptr
+		};
+
+		vk::PipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+		std::vector<vk::DynamicState> dynamicStates = {
+			vk::DynamicState::eViewport,
+			vk::DynamicState::eScissor
+		};
+
+		vk::PipelineDynamicStateCreateInfo dynamicState {
+			.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
+			.pDynamicStates = dynamicStates.data()
+		};
+
+		vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
+
+		vk::PipelineInputAssemblyStateCreateInfo inputAssembly {
+			.topology = vk::PrimitiveTopology::eTriangleList
+		};
+
+		// vk::Viewport viewport {
+		// 	.x = 0.0f,
+		// 	.y = 0.0f,
+		// 	.width = static_cast<float>(swapChainExtent.width),
+		// 	.height = static_cast<float>(swapChainExtent.height),
+		// 	.minDepth = 0.0f,
+		// 	.maxDepth = 1.0f
+		// };
+		//
+		// vk::Rect2D scissor {
+		// 	.offset = vk::Offset2D { 0, 0 },
+		// 	.extent = swapChainExtent
+		// };
+
+		vk::PipelineViewportStateCreateInfo viewportState {
+			.viewportCount = 1,
+			// .pViewports = &viewport,
+			.scissorCount = 1,
+			// .pScissors = &scissor
+		};
+
+		vk::PipelineRasterizationStateCreateInfo rasterizer {
+			.depthClampEnable = false,
+			.rasterizerDiscardEnable = false,
+			.polygonMode = vk::PolygonMode::eFill,
+			.cullMode = vk::CullModeFlagBits::eBack,
+			.frontFace = vk::FrontFace::eClockwise,
+			.depthBiasEnable = false,
+			.lineWidth = 1.0f
+		};
+
+		vk::PipelineMultisampleStateCreateInfo multisampling {
+			.rasterizationSamples = vk::SampleCountFlagBits::e1,
+			.sampleShadingEnable = false
+		};
+
+		vk::PipelineColorBlendAttachmentState colorBlendAttachment {
+			.blendEnable = true,
+			.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+			.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+			.colorBlendOp = vk::BlendOp::eAdd,
+			.srcAlphaBlendFactor = vk::BlendFactor::eOne,
+			.dstAlphaBlendFactor = vk::BlendFactor::eZero,
+			.alphaBlendOp = vk::BlendOp::eAdd,
+			.colorWriteMask =
+				vk::ColorComponentFlagBits::eR |
+				vk::ColorComponentFlagBits::eG |
+				vk::ColorComponentFlagBits::eB |
+				vk::ColorComponentFlagBits::eA
+		};
+
+		vk::PipelineColorBlendStateCreateInfo colorBlending
+		{
+			.logicOpEnable = false,
+			.logicOp = vk::LogicOp::eCopy,
+			.attachmentCount = 1,
+			.pAttachments = &colorBlendAttachment
+		};
+
+		vk::PipelineLayoutCreateInfo pipelineLayoutInfo {
+			.setLayoutCount = 0,
+			.pushConstantRangeCount = 0
+		};
+
+		pipelineLayout = vk::raii::PipelineLayout(device, pipelineLayoutInfo);
+
+		vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo {
+			.colorAttachmentCount = 1,
+			.pColorAttachmentFormats = &swapChainSurfaceFormat.format
+		};
+
+		vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {
+			.stageCount = 2,
+			.pStages = shaderStages,
+			.pVertexInputState = &vertexInputInfo,
+			.pInputAssemblyState = &inputAssembly,
+			.pViewportState = &viewportState,
+			.pRasterizationState = &rasterizer,
+			.pMultisampleState = &multisampling,
+			.pColorBlendState = &colorBlending,
+			.pDynamicState = &dynamicState,
+			.layout = pipelineLayout,
+			.renderPass = nullptr // dynamic rendering
+		};
+
+		vk::StructureChain<
+			vk::GraphicsPipelineCreateInfo,
+			vk::PipelineRenderingCreateInfo
+		> pipelineCreateInfoChain = { graphicsPipelineCreateInfo , pipelineRenderingCreateInfo };
+
+		graphicsPipeline = vk::raii::Pipeline(device, nullptr, pipelineCreateInfoChain.get<vk::GraphicsPipelineCreateInfo>());
+	}
+
+	[[nodiscard]]
+	vk::raii::ShaderModule createShaderModule(const std::vector<char>& code) const
+	{
+		vk::ShaderModuleCreateInfo createInfo {
+			.codeSize = code.size() * sizeof(char),
+			.pCode = reinterpret_cast<const uint32_t*>(code.data())
+		};
+		vk::raii::ShaderModule shaderModule(device, createInfo);
+		return shaderModule;
+	}
+
+	static std::vector<char> readFile(const std::string& filename)
+	{
+		std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+		if (!file.is_open())
+		{
+			throw std::runtime_error("failed to open file");
+		}
+
+		std::vector<char> buffer(file.tellg());
+		file.seekg(0, std::ios::beg);
+		file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+		file.close();
+
+		return buffer;
+	}
+
+	void createCommandPool()
+	{
+		vk::CommandPoolCreateInfo poolInfo {
+			.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+			.queueFamilyIndex = queueIndex
+		};
+		commandPool = vk::raii::CommandPool(device, poolInfo);
 	}
 
 	void mainLoop()
