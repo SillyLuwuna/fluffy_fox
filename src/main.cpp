@@ -181,6 +181,7 @@ int main()
 	{
 		VulkanTutorial app;
 		app.run();
+		std::cout << "uwu\n";
 	}
 	catch (const std::exception& e)
 	{
@@ -188,5 +189,6 @@ int main()
 		return 1;
 	}
 
+	std::cout << "owo\n";
 	return 0;
 }
