@@ -1,5 +1,7 @@
+#pragma once
+
 #include <GLFW/glfw3.h>
-#include <GLFW/glfw3native.h>
+// #include <GLFW/glfw3native.h>
 #include <string>
 
 namespace fluffy_fox::rendering
@@ -27,9 +29,9 @@ namespace fluffy_fox::rendering
 		uint16_t width() const;
 		uint16_t height() const;
 
-		void* get_platform_window() const;
-		void* get_platform_display() const;
-		bool is_wayland() const;
+		// void* get_platform_window() const;
+		// void* get_platform_display() const;
+		// bool is_wayland() const;
 
 		void start_event_loop();
 		void attach_renderer(Renderer& renderer);

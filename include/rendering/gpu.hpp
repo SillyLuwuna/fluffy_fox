@@ -1,3 +1,5 @@
+#pragma once
+
 #include "hwinfo/gpu.h"
 #include <cstdint>
 #include <string>

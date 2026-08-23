@@ -1,19 +1,19 @@
 #include <iostream>
-#if defined(__unix__)
-	#if defined(__has_include) && __has_include(<wayland-client.h>)
-		#define IS_WAYLAND
-		#define GLFW_EXPOSE_NATIVE_WAYLAND
-	#else
-		#define IS_X11
-		#define GLFW_EXPOSE_NATIVE_X11
-	#endif
-#elif defined(_WIN32)
-	#define IS_WINDOWS
-	#define GLFW_EXPOSE_NATIVE_WIN32
-#elif defined(__APPLE__)
-	#define IS_APPLE
-	#define GLFW_EXPOSE_NATIVE_COCOA
-#endif
+// #if defined(__unix__)
+// 	#if defined(__has_include) && __has_include(<wayland-client.h>)
+// 		#define IS_WAYLAND
+// 		#define GLFW_EXPOSE_NATIVE_WAYLAND
+// 	#else
+// 		#define IS_X11
+// 		#define GLFW_EXPOSE_NATIVE_X11
+// 	#endif
+// #elif defined(_WIN32)
+// 	#define IS_WINDOWS
+// 	#define GLFW_EXPOSE_NATIVE_WIN32
+// #elif defined(__APPLE__)
+// 	#define IS_APPLE
+// 	#define GLFW_EXPOSE_NATIVE_COCOA
+// #endif
 
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
@@ -91,58 +91,58 @@ void Window::start_event_loop()
 	spdlog::info("closing window");
 }
 
-void* Window::get_platform_window() const
-{
-	switch (glfwGetPlatform())
-	{
-#if defined(IS_WAYLAND)
-		case GLFW_PLATFORM_WAYLAND:
-			return glfwGetWaylandWindow(window_);
-			break;
-#elif defined(IS_X11)
-		case GLFW_PLATFORM_X11:
-			return glfwGetX11Window(window_);
-			break;
-#elif defined(IS_APPLE)
-		case GLFW_PLATFORM_COCOA:
-			return glfwGetCocoaWindow(window_);
-			break;
-#elif defined(IS_WINDOWS)
-		case GLFW_PLATFORM_WIN32:
-			return glfwGetWin32Window(window_);
-			break;
-#endif
-	}
+// void* Window::get_platform_window() const
+// {
+// 	switch (glfwGetPlatform())
+// 	{
+// #if defined(IS_WAYLAND)
+// 		case GLFW_PLATFORM_WAYLAND:
+// 			return glfwGetWaylandWindow(window_);
+// 			break;
+// #elif defined(IS_X11)
+// 		case GLFW_PLATFORM_X11:
+// 			return glfwGetX11Window(window_);
+// 			break;
+// #elif defined(IS_APPLE)
+// 		case GLFW_PLATFORM_COCOA:
+// 			return glfwGetCocoaWindow(window_);
+// 			break;
+// #elif defined(IS_WINDOWS)
+// 		case GLFW_PLATFORM_WIN32:
+// 			return glfwGetWin32Window(window_);
+// 			break;
+// #endif
+// 	}
+//
+// 	return nullptr;
+// }
 
-	return nullptr;
-}
+// void* Window::get_platform_display() const
+// {
+// 	switch (glfwGetPlatform())
+// 	{
+// #if defined(IS_WAYLAND)
+// 		case GLFW_PLATFORM_WAYLAND:
+// 			return glfwGetWaylandDisplay();
+// 			break;
+// #elif defined(IS_X11)
+// 		case GLFW_PLATFORM_X11:
+// 			return glfwGetX11Display();
+// 			break;
+// #endif
+// 	}
+//
+// 	return nullptr;
+// }
 
-void* Window::get_platform_display() const
-{
-	switch (glfwGetPlatform())
-	{
-#if defined(IS_WAYLAND)
-		case GLFW_PLATFORM_WAYLAND:
-			return glfwGetWaylandDisplay();
-			break;
-#elif defined(IS_X11)
-		case GLFW_PLATFORM_X11:
-			return glfwGetX11Display();
-			break;
-#endif
-	}
-
-	return nullptr;
-}
-
-bool Window::is_wayland() const
-{
-#if defined(IS_WAYLAND)
-	return true;
-#else
-	return false;
-#endif
-}
+// bool Window::is_wayland() const
+// {
+// #if defined(IS_WAYLAND)
+// 	return true;
+// #else
+// 	return false;
+// #endif
+// }
 
 GLFWwindow* Window::get_handle() const
 {

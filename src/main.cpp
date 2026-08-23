@@ -174,14 +174,13 @@ int main()
 {
 	setup_logger();
 
-	// Window window("owo", 840, 630);
+	Window window("owo", 840, 630);
 	// Renderer::instance().start(window, RendererType::Vulkan, false, 360);
 
 	try
 	{
-		VulkanTutorial app;
+		VulkanTutorial app(window);
 		app.run();
-		std::cout << "uwu\n";
 	}
 	catch (const std::exception& e)
 	{
@@ -189,6 +188,5 @@ int main()
 		return 1;
 	}
 
-	std::cout << "owo\n";
 	return 0;
 }
