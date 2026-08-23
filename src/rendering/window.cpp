@@ -29,7 +29,8 @@ Window::Window(const std::string& name, int width, int height) :
 	width_(width),
 	height_(height),
 	window_(nullptr),
-	attached_renderer_(nullptr)
+	attached_renderer_(nullptr),
+	waiting_for_focus_(false)
 {
 	// if (Renderer::instance().is_running())
 	// {
@@ -53,14 +54,29 @@ Window::Window(const std::string& name, int width, int height) :
 		throw std::runtime_error("could not create window");
 	}
 
+	setup_events();
+}
+
+void Window::setup_events()
+{
 	glfwSetWindowUserPointer(window_, this);
+
 	glfwSetFramebufferSizeCallback(window_, resize_callback);
+	glfwSetWindowFocusCallback(window_, focus_callback);
 }
 
 void Window::resize_callback(GLFWwindow* window, int32_t width, int32_t height)
 {
 	Window* obj = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
 	obj->resize_event_.invoke(width, height);
+}
+
+void Window::focus_callback(GLFWwindow* window, int focused)
+{
+	Window* obj = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
+
+	obj->waiting_for_focus_ = false;
+	obj->focus_event_.invoke(focused);
 }
 
 Window::~Window()
@@ -183,6 +199,11 @@ fluffy_fox::Event<int32_t, int32_t>& Window::resize_event()
 	return resize_event_;
 }
 
+fluffy_fox::Event<bool>& Window::focus_event()
+{
+	return focus_event_;
+}
+
 void Window::block_while_minimized()
 {
 	int width = 0;
@@ -195,4 +216,14 @@ void Window::block_while_minimized()
 		glfwWaitEvents();
 		glfwGetFramebufferSize(window_, &width, &height);
 	}
+}
+
+void Window::block_while_unfocused()
+{
+	waiting_for_focus_ = true;
+	while (waiting_for_focus_)
+	{
+		glfwWaitEvents();
+	}
+	// if (!waiting_for_focus)
 }

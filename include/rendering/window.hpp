@@ -17,8 +17,12 @@ namespace fluffy_fox::rendering
 		GLFWwindow* window_;
 		Renderer* attached_renderer_;
 		Event<int32_t, int32_t> resize_event_;
+		Event<bool> focus_event_;
+		bool waiting_for_focus_;
 
+		void setup_events();
 		static void resize_callback(GLFWwindow* window, int32_t width, int32_t height);
+		static void focus_callback(GLFWwindow* window, int focused);
 
 	public:
 		Window(const Window&) = delete;
@@ -42,7 +46,9 @@ namespace fluffy_fox::rendering
 		void detach_renderer();
 
 		Event<int32_t, int32_t>& resize_event();
+		Event<bool>& focus_event();
 
 		void block_while_minimized();
+		void block_while_unfocused();
 	};
 }

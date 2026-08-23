@@ -66,6 +66,7 @@ namespace fluffy_fox::rendering
 		void setWindowSettings()
 		{
 			window.resize_event().subscribe(&VulkanTutorial::framebufferResizeCallback, this);
+			window.focus_event().subscribe(&VulkanTutorial::onFocusEvent, this);
 		}
 
 		void setupDebugMessenger()
@@ -749,7 +750,7 @@ namespace fluffy_fox::rendering
 
 			if (result == vk::Result::eErrorOutOfDateKHR)
 			{
-				std::cout << "changed!\n";
+				framebufferResized = false;
 				recreateSwapChain();
 				return;
 			}
@@ -789,7 +790,6 @@ namespace fluffy_fox::rendering
 			result = graphicsQueue.presentKHR(presentInfoKHR);
 			if ((result == vk::Result::eSuboptimalKHR) || (result == vk::Result::eErrorOutOfDateKHR) || framebufferResized)
 			{
-				std::cout << "changed!\n";
 				framebufferResized = false;
 				recreateSwapChain();
 			}
@@ -809,6 +809,7 @@ namespace fluffy_fox::rendering
 
 		void recreateSwapChain()
 		{
+			std::cout << "recreating\n";
 			window.block_while_minimized();
 
 			// slow, instead of waiting, just pass the old swapchain as oldSwapchain in the new swapchain
@@ -819,6 +820,19 @@ namespace fluffy_fox::rendering
 
 			createSwapChain();
 			createImageViews();
+		}
+
+		void framebufferResizeCallback(int , int )
+		{
+			framebufferResized = true;
+		}
+
+		void onFocusEvent(bool focus)
+		{
+			if (!focus)
+			{
+				window.block_while_unfocused();
+			}
 		}
 
 	public:
@@ -836,11 +850,6 @@ namespace fluffy_fox::rendering
 			createCommandPool();
 			createCommandBuffers();
 			createSyncObjects();
-		}
-
-		void framebufferResizeCallback(int , int )
-		{
-			framebufferResized = true;
 		}
 
 		void run()
