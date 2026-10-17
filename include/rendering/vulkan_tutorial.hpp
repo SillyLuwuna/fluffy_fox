@@ -3,7 +3,10 @@
 #include <iostream>
 #include <vulkan/vulkan_raii.hpp>
 #include <fstream>
+#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <chrono>
 #include "rendering/window.hpp"
 
 namespace fluffy_fox::rendering
@@ -67,6 +70,13 @@ namespace fluffy_fox::rendering
 		0, 1, 2, 2, 3, 0
 	};
 
+	struct UniformBufferObject
+	{
+		alignas(16) glm::mat4 model;
+		alignas(16) glm::mat4 view;
+		alignas(16) glm::mat4 proj;
+	};
+
 	class VulkanTutorial
 	{
 	private:
@@ -84,6 +94,7 @@ namespace fluffy_fox::rendering
 		vk::SurfaceFormatKHR swapChainSurfaceFormat;
 		vk::Extent2D swapChainExtent;
 		std::vector<vk::raii::ImageView> swapChainImageViews;
+		vk::raii::DescriptorSetLayout descriptorSetLayout = nullptr;
 		vk::raii::PipelineLayout pipelineLayout = nullptr;
 		vk::raii::Pipeline graphicsPipeline = nullptr;
 		vk::raii::CommandPool commandPool = nullptr;
@@ -92,6 +103,13 @@ namespace fluffy_fox::rendering
 		vk::raii::DeviceMemory vertexBufferMemory = nullptr;
 		vk::raii::Buffer indexBuffer = nullptr;
 		vk::raii::DeviceMemory indexBufferMemory = nullptr;
+
+		vk::raii::DescriptorPool descriptorPool = nullptr;
+		std::vector<vk::raii::DescriptorSet> descriptorSets;
+
+		std::vector<vk::raii::Buffer> uniformBuffers;
+		std::vector<vk::raii::DeviceMemory> uniformBuffersMemory;
+		std::vector<void*> uniformBuffersMapped;
 
 		std::vector<vk::raii::CommandBuffer> commandBuffers;
 		std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
@@ -467,6 +485,23 @@ namespace fluffy_fox::rendering
 			}
 		}
 
+		void createDescriptorSetLayout()
+		{
+			vk::DescriptorSetLayoutBinding uboLayoutBinding {
+				.binding = 0,
+				.descriptorType = vk::DescriptorType::eUniformBuffer,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eVertex
+			};
+
+			vk::DescriptorSetLayoutCreateInfo layoutInfo {
+				.bindingCount = 1,
+				.pBindings = &uboLayoutBinding
+			};
+
+			descriptorSetLayout = vk::raii::DescriptorSetLayout(device, layoutInfo);
+		}
+
 		void createGraphicsPipeline()
 		{
 			std::vector<char> shaderCode = readFile("shaders/slang.spv");
@@ -537,7 +572,8 @@ namespace fluffy_fox::rendering
 				.rasterizerDiscardEnable = false,
 				.polygonMode = vk::PolygonMode::eFill,
 				.cullMode = vk::CullModeFlagBits::eBack,
-				.frontFace = vk::FrontFace::eClockwise,
+				.frontFace = vk::FrontFace::eCounterClockwise,
+				// .frontFace = vk::FrontFace::eClockwise,
 				.depthBiasEnable = false,
 				.lineWidth = 1.0f
 			};
@@ -571,7 +607,8 @@ namespace fluffy_fox::rendering
 			};
 
 			vk::PipelineLayoutCreateInfo pipelineLayoutInfo {
-				.setLayoutCount = 0,
+				.setLayoutCount = 1,
+				.pSetLayouts = &*descriptorSetLayout,
 				.pushConstantRangeCount = 0
 			};
 
@@ -751,6 +788,72 @@ namespace fluffy_fox::rendering
 			copyBuffer(stagingBuffer, indexBuffer, bufferSize);
 		}
 
+		void createUniformBuffers()
+		{
+			for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+			{
+				vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
+				auto [buffer, bufferMem] = createBuffer(
+					bufferSize,
+					vk::BufferUsageFlagBits::eUniformBuffer,
+					vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+				);
+				uniformBuffers.emplace_back(std::move(buffer));
+				uniformBuffersMemory.emplace_back(std::move(bufferMem));
+				uniformBuffersMapped.emplace_back(uniformBuffersMemory.back().mapMemory(0, bufferSize));
+			}
+		}
+
+		void createDescriptorPool()
+		{
+			vk::DescriptorPoolSize poolSize {
+				.type = vk::DescriptorType::eUniformBuffer,
+				.descriptorCount = MAX_FRAMES_IN_FLIGHT
+			};
+
+			vk::DescriptorPoolCreateInfo poolInfo {
+				.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+				.maxSets = MAX_FRAMES_IN_FLIGHT,
+				.poolSizeCount = 1,
+				.pPoolSizes = &poolSize
+			};
+
+			descriptorPool = vk::raii::DescriptorPool(device, poolInfo);
+		}
+
+		void createDescriptorSets()
+		{
+			std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, *descriptorSetLayout);
+
+			vk::DescriptorSetAllocateInfo allocInfo {
+				.descriptorPool = descriptorPool,
+				.descriptorSetCount = static_cast<uint32_t>(layouts.size()),
+				.pSetLayouts = layouts.data()
+			};
+
+			descriptorSets = device.allocateDescriptorSets(allocInfo);
+
+			for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+			{
+				vk::DescriptorBufferInfo bufferInfo {
+					.buffer = uniformBuffers[i],
+					.offset = 0,
+					.range = sizeof(UniformBufferObject)
+				};
+
+				vk::WriteDescriptorSet descriptorWrite {
+					.dstSet = descriptorSets[i],
+					.dstBinding = 0,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.pBufferInfo = &bufferInfo
+				};
+
+				device.updateDescriptorSets(descriptorWrite, {});
+			}
+		}
+
 		uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
 		{
 			// selecting a specific heap "memoryHeaps" may increase performance
@@ -767,8 +870,9 @@ namespace fluffy_fox::rendering
 			throw std::runtime_error("failed to find suitable memory type!");
 		}
 
-		void recordCommandBuffer(vk::raii::CommandBuffer& commandBuffer, uint32_t imageIndex)
+		void recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex)
 		{
+			vk::raii::CommandBuffer& commandBuffer = commandBuffers[frameIndex];
 			vk::CommandBufferBeginInfo beginInfo {};
 			commandBuffer.begin(beginInfo);
 
@@ -812,9 +916,10 @@ namespace fluffy_fox::rendering
 
 			vk::Viewport viewport {
 				.x = 0.0f,
-				.y = 0.0f,
+				// .y = 0.0f,
+				.y = static_cast<float>(swapChainExtent.height), // because of glm, to flip Y coordinate
 				.width = static_cast<float>(swapChainExtent.width),
-				.height = static_cast<float>(swapChainExtent.height),
+				.height = -static_cast<float>(swapChainExtent.height), // minus sign because of glm, which assumes Y coordinate is flipped
 				.minDepth = 0.0f,
 				.maxDepth = 1.0f
 			};
@@ -827,6 +932,7 @@ namespace fluffy_fox::rendering
 			commandBuffer.setViewport(0, viewport);
 			commandBuffer.setScissor(0, scissor);
 
+			commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, *descriptorSets[frameIndex], nullptr);
 			// commandBuffer.draw(3, 1, 0, 0);
 			// commandBuffer.draw(vertices.size(), 1, 0, 0);
 			commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
@@ -936,10 +1042,12 @@ namespace fluffy_fox::rendering
 				throw std::runtime_error("failed to acquire swapchain image!");
 			}
 
+			updateUniformBuffer(frameIndex);
+
 			device.resetFences(*inFlightFences[frameIndex]);
 
 			commandBuffers[frameIndex].reset();
-			recordCommandBuffer(commandBuffers[frameIndex], imageIndex);
+			recordCommandBuffer(frameIndex, imageIndex);
 
 			vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
 			const vk::SubmitInfo submitInfo {
@@ -975,6 +1083,23 @@ namespace fluffy_fox::rendering
 			}
 
 			frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+		}
+
+		void updateUniformBuffer(uint32_t currentImage)
+		{
+			// using a UBO this way is not the most efficient way to pass frequently changing values to the shader.
+			// a more efficient way to pass a small buffer of data to shaders is "push constants".
+			static auto startTime = std::chrono::high_resolution_clock::now();
+
+			auto currentTime = std::chrono::high_resolution_clock::now();
+			float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+			UniformBufferObject ubo{};
+			ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+			ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+			ubo.proj = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / static_cast<float>(swapChainExtent.height), 0.1f, 10.0f);
+
+			memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 		}
 
 		void cleanupSwapChain()
@@ -1022,10 +1147,14 @@ namespace fluffy_fox::rendering
 			createLogicalDevice();
 			createSwapChain();
 			createImageViews();
+			createDescriptorSetLayout();
 			createGraphicsPipeline();
 			createCommandPool();
 			createVertexBuffer();
 			createIndexBuffer();
+			createUniformBuffers();
+			createDescriptorPool();
+			createDescriptorSets();
 			createCommandBuffers();
 			createSyncObjects();
 		}
