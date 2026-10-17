@@ -2,9 +2,15 @@
 
 type=$1
 
+# if [ -z "$type" ]
+# then
+# 	type=Release
+# else
+# 	type=$type
+# fi
 if [ -z "$type" ]
 then
-	type=Release
+	type=Debug
 else
 	type=$type
 fi
