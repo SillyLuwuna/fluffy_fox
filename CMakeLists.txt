@@ -143,7 +143,7 @@ target_compile_options(${BIN} PRIVATE
 	-Wall
 	-Wextra
 	-Wpedantic
-	-O2
+	-O0
 )
 
 # tests

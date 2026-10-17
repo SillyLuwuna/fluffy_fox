@@ -2,27 +2,71 @@
 
 #include <iostream>
 #include <vulkan/vulkan_raii.hpp>
-// #include <GLFW/glfw3.h>
 #include <fstream>
+#include <glm/glm.hpp>
 #include "rendering/window.hpp"
-
-constexpr uint32_t WIDTH = 800;
-constexpr uint32_t HEIGHT = 600;
-
-constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
-
-const std::vector<char const*> validationLayers = {
-	"VK_LAYER_KHRONOS_validation"
-};
-
-#ifdef DEBUG
-	constexpr bool enableValidationLayers = true;
-#else
-	constexpr bool enableValidationLayers = false;
-#endif
 
 namespace fluffy_fox::rendering
 {
+	constexpr uint32_t WIDTH = 800;
+	constexpr uint32_t HEIGHT = 600;
+
+	constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
+
+	const std::vector<char const*> validationLayers = {
+		"VK_LAYER_KHRONOS_validation"
+	};
+
+#ifdef DEBUG
+		constexpr bool enableValidationLayers = true;
+#else
+		constexpr bool enableValidationLayers = false;
+#endif
+
+	struct Vertex
+	{
+		glm::vec2 pos;
+		glm::vec3 color;
+
+		static vk::VertexInputBindingDescription getBindingDescription()
+		{
+			return {
+				.binding = 0,
+				.stride = sizeof(Vertex),
+				.inputRate = vk::VertexInputRate::eVertex
+			};
+		}
+
+		static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions()
+		{
+			return {{
+				{
+					.location = 0,
+					.binding = 0,
+					.format = vk::Format::eR32G32Sfloat,
+					.offset = offsetof(Vertex, pos)
+				},
+				{
+					.location = 1,
+					.binding = 0,
+					.format = vk::Format::eR32G32B32Sfloat,
+					.offset = offsetof(Vertex, color)
+				}
+			}};
+		}
+	};
+
+	const std::vector<Vertex> vertices = {
+		{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+		{{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+		{{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+		{{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+	};
+
+	const std::vector<uint16_t> indices = {
+		0, 1, 2, 2, 3, 0
+	};
+
 	class VulkanTutorial
 	{
 	private:
@@ -43,6 +87,11 @@ namespace fluffy_fox::rendering
 		vk::raii::PipelineLayout pipelineLayout = nullptr;
 		vk::raii::Pipeline graphicsPipeline = nullptr;
 		vk::raii::CommandPool commandPool = nullptr;
+		// PERF vertexBuffer and indexBuffer should be the same buffer for performance
+		vk::raii::Buffer vertexBuffer = nullptr;
+		vk::raii::DeviceMemory vertexBufferMemory = nullptr;
+		vk::raii::Buffer indexBuffer = nullptr;
+		vk::raii::DeviceMemory indexBufferMemory = nullptr;
 
 		std::vector<vk::raii::CommandBuffer> commandBuffers;
 		std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
@@ -449,7 +498,14 @@ namespace fluffy_fox::rendering
 				.pDynamicStates = dynamicStates.data()
 			};
 
-			vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
+			vk::VertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
+			std::array<vk::VertexInputAttributeDescription, 2> attributeDesceriptions = Vertex::getAttributeDescriptions();
+			vk::PipelineVertexInputStateCreateInfo vertexInputInfo {
+				.vertexBindingDescriptionCount = 1,
+				.pVertexBindingDescriptions = &bindingDescription,
+				.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDesceriptions.size()),
+				.pVertexAttributeDescriptions = attributeDesceriptions.data()
+			};
 
 			vk::PipelineInputAssemblyStateCreateInfo inputAssembly {
 				.topology = vk::PrimitiveTopology::eTriangleList
@@ -596,6 +652,121 @@ namespace fluffy_fox::rendering
 			// commandBuffer = std::move(vk::raii::CommandBuffers(device, allocInfo).front());
 		}
 
+		void createVertexBuffer()
+		{
+			vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+			auto [stagingBuffer, stagingBufferMemory] = createBuffer(
+				bufferSize,
+				vk::BufferUsageFlagBits::eTransferSrc,
+				vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+			);
+
+			void* dataStaging = stagingBufferMemory.mapMemory(0, bufferSize);
+			memcpy(dataStaging, vertices.data(), bufferSize);
+			stagingBufferMemory.unmapMemory();
+			// eHostCoherent guarantees after this point that the data is actually there. Could also call a function to flush the memory
+			// however eHostCoherent is less performant than explicit flushing
+			// this will be uploaded to the gpu asynchronously, and will be complete as of the next call to vk::raii::Queue::submit
+
+			std::tie(vertexBuffer, vertexBufferMemory) = createBuffer(
+				bufferSize,
+				vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+				vk::MemoryPropertyFlagBits::eDeviceLocal
+			);
+
+			copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+		}
+
+		void copyBuffer(vk::raii::Buffer& srcBuffer, vk::raii::Buffer& dstBuffer, vk::DeviceSize size)
+		{
+			// use a separate command pool for these short-lived buffers, for optimizations.
+			// vk::CommandPoolCreateFlagBits::eTransient would be needed in command pool generation, in that case.
+
+			vk::CommandBufferAllocateInfo allocInfo {
+				.commandPool = commandPool,
+				.level = vk::CommandBufferLevel::ePrimary,
+				.commandBufferCount = 1
+			};
+
+			vk::raii::CommandBuffer commandCopyBuffer = std::move(device.allocateCommandBuffers(allocInfo).front());
+
+			commandCopyBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+			commandCopyBuffer.copyBuffer(*srcBuffer, *dstBuffer, vk::BufferCopy(0, 0, size));
+			commandCopyBuffer.end();
+
+			graphicsQueue.submit(vk::SubmitInfo {
+				.commandBufferCount = 1,
+				.pCommandBuffers = &*commandCopyBuffer
+			}, nullptr);
+			graphicsQueue.waitIdle();
+			// we can use vk::raii::waitForFences instead if we want to schedule multiple transfers simultaneously
+		}
+
+		std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties)
+		{
+			vk::BufferCreateInfo bufferInfo {
+				.size = size,
+				.usage = usage,
+				.sharingMode = vk::SharingMode::eExclusive
+			};
+
+			vk::raii::Buffer buffer = vk::raii::Buffer(device, bufferInfo);
+			vk::MemoryRequirements memRequirements = buffer.getMemoryRequirements();
+
+			vk::MemoryAllocateInfo allocInfo = {
+				.allocationSize = memRequirements.size,
+				.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties)
+			};
+
+			vk::raii::DeviceMemory bufferMemory = vk::raii::DeviceMemory(device, allocInfo);
+			buffer.bindMemory(*bufferMemory, 0); // second parameter is the offset within the region of memory
+			return {
+				std::move(buffer),
+				std::move(bufferMemory)
+			};
+		}
+
+		void createIndexBuffer()
+		{
+			// this is essentially the same as createVertexBuffer...
+			vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+			auto [stagingBuffer, stagingBufferMemory] = createBuffer(
+				bufferSize,
+				vk::BufferUsageFlagBits::eTransferSrc,
+				vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent // PERF eHostCoherent
+			);
+
+			void* dataStaging = stagingBufferMemory.mapMemory(0, bufferSize);
+			memcpy(dataStaging, indices.data(), bufferSize);
+			stagingBufferMemory.unmapMemory();
+
+			std::tie(indexBuffer, indexBufferMemory) = createBuffer(
+				bufferSize,
+				vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+				vk::MemoryPropertyFlagBits::eDeviceLocal
+			);
+
+			copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+		}
+
+		uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
+		{
+			// selecting a specific heap "memoryHeaps" may increase performance
+			vk::PhysicalDeviceMemoryProperties memProperties = physicalDevice.getMemoryProperties();
+
+			for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+			{
+				if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+				{
+					return i;
+				}
+			}
+
+			throw std::runtime_error("failed to find suitable memory type!");
+		}
+
 		void recordCommandBuffer(vk::raii::CommandBuffer& commandBuffer, uint32_t imageIndex)
 		{
 			vk::CommandBufferBeginInfo beginInfo {};
@@ -636,6 +807,9 @@ namespace fluffy_fox::rendering
 			commandBuffer.beginRendering(renderingInfo);
 			commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
+			commandBuffer.bindVertexBuffers(0, *vertexBuffer, {0});
+			commandBuffer.bindIndexBuffer(*indexBuffer, 0, vk::IndexType::eUint16);
+
 			vk::Viewport viewport {
 				.x = 0.0f,
 				.y = 0.0f,
@@ -653,7 +827,9 @@ namespace fluffy_fox::rendering
 			commandBuffer.setViewport(0, viewport);
 			commandBuffer.setScissor(0, scissor);
 
-			commandBuffer.draw(3, 1, 0, 0);
+			// commandBuffer.draw(3, 1, 0, 0);
+			// commandBuffer.draw(vertices.size(), 1, 0, 0);
+			commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
 			commandBuffer.endRendering();
 			// TODO needs synchronization here?
@@ -848,6 +1024,8 @@ namespace fluffy_fox::rendering
 			createImageViews();
 			createGraphicsPipeline();
 			createCommandPool();
+			createVertexBuffer();
+			createIndexBuffer();
 			createCommandBuffers();
 			createSyncObjects();
 		}
