@@ -1,27 +1,12 @@
 #include <iostream>
-// #if defined(__unix__)
-// 	#if defined(__has_include) && __has_include(<wayland-client.h>)
-// 		#define IS_WAYLAND
-// 		#define GLFW_EXPOSE_NATIVE_WAYLAND
-// 	#else
-// 		#define IS_X11
-// 		#define GLFW_EXPOSE_NATIVE_X11
-// 	#endif
-// #elif defined(_WIN32)
-// 	#define IS_WINDOWS
-// 	#define GLFW_EXPOSE_NATIVE_WIN32
-// #elif defined(__APPLE__)
-// 	#define IS_APPLE
-// 	#define GLFW_EXPOSE_NATIVE_COCOA
-// #endif
+#include <stdexcept>
 
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
+
 #include "rendering/window.hpp"
 #include "spdlog/spdlog.h"
 #include "rendering/renderer.hpp"
-
-#include <stdexcept>
 
 using namespace fluffy_fox::rendering;
 

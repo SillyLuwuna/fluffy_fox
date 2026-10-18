@@ -237,6 +237,7 @@
 //
 // void Renderer::render_frame()
 // {
+// // FIXME doesn't actually cap fps correctly, setting higher fps makes the program have more fps under limit
 // 	auto frame_start_time = std::chrono::high_resolution_clock::now();
 // 	uint64_t delta_us = std::chrono::duration_cast<std::chrono::microseconds>(frame_start_time - last_frame_time_).count();
 // 	last_frame_time_ = frame_start_time;

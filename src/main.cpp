@@ -1,16 +1,8 @@
-#include "events/event.hpp"
-#include "networking/tcp_client.hpp"
-#include "networking/tcp_server.hpp"
 #include "rendering/renderer.hpp"
-#include "spdlog/async.h"
-#include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
-// #include <hwinfo/hwinfo.h>
-#include <algorithm>
 #include <iostream>
-#include <cstdint>
 #include "rendering/window.hpp"
 #include "rendering/vulkan_tutorial.hpp"
 
