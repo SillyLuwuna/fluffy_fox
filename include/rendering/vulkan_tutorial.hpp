@@ -5,11 +5,15 @@
 #include <fstream>
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
+#include <glm/gtx/hash.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
 
 #include "rendering/window.hpp"
 
@@ -17,6 +21,8 @@ namespace fluffy_fox::rendering
 {
 	constexpr uint32_t WIDTH = 800;
 	constexpr uint32_t HEIGHT = 600;
+	const std::string MODEL_PATH = "models/viking_room.obj";
+	const std::string TEXTURE_PATH = "textures/viking_room.png";
 
 	constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -35,6 +41,11 @@ namespace fluffy_fox::rendering
 		glm::vec3 pos;
 		glm::vec3 color;
 		glm::vec2 texCoord;
+
+		bool operator==(const Vertex& other) const
+		{
+			return pos == other.pos && color == other.color && texCoord == other.texCoord;
+		}
 
 		static vk::VertexInputBindingDescription getBindingDescription()
 		{
@@ -70,23 +81,6 @@ namespace fluffy_fox::rendering
 		}
 	};
 
-	const std::vector<Vertex> vertices = {
-		{{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-		{{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-		{{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-		{{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-
-		{{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-		{{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-		{{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-		{{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
-	};
-
-	const std::vector<uint16_t> indices = {
-		0, 1, 2, 2, 3, 0,
-		4, 5, 6, 6, 7, 4
-	};
-
 	struct UniformBufferObject
 	{
 		alignas(16) glm::mat4 model;
@@ -94,6 +88,21 @@ namespace fluffy_fox::rendering
 		alignas(16) glm::mat4 proj;
 	};
 
+}
+
+namespace std
+{
+	template<> struct hash<fluffy_fox::rendering::Vertex>
+	{
+		size_t operator()(fluffy_fox::rendering::Vertex const& vertex) const
+		{
+			return ((hash<glm::vec3>()(vertex.pos) ^ (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^ (hash<glm::vec2>()(vertex.texCoord) << 1);
+		}
+	};
+}
+
+namespace fluffy_fox::rendering
+{
 	class VulkanTutorial
 	{
 	private:
@@ -115,6 +124,8 @@ namespace fluffy_fox::rendering
 		vk::raii::PipelineLayout pipelineLayout = nullptr;
 		vk::raii::Pipeline graphicsPipeline = nullptr;
 		vk::raii::CommandPool commandPool = nullptr;
+		std::vector<Vertex> vertices;
+		std::vector<uint32_t> indices;
 		// PERF vertexBuffer and indexBuffer should be the same buffer for performance
 		vk::raii::Buffer vertexBuffer = nullptr;
 		vk::raii::DeviceMemory vertexBufferMemory = nullptr;
@@ -754,7 +765,7 @@ namespace fluffy_fox::rendering
 		void createTextureImage()
 		{
 			int texWidth, texHeight, texChannels;
-			stbi_uc* pixels = stbi_load("textures/fluff.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+			stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 			vk::DeviceSize imageSize = texWidth * texHeight * 4;
 
 			if (!pixels)
@@ -977,6 +988,50 @@ namespace fluffy_fox::rendering
 			};
 
 			textureSampler = vk::raii::Sampler(device, samplerInfo);
+		}
+
+		void loadModel()
+		{
+			tinyobj::attrib_t attrib;
+			std::vector<tinyobj::shape_t> shapes;
+			std::vector<tinyobj::material_t> materials;
+			std::string warn, err;
+
+			if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str()))
+			{
+				throw std::runtime_error(warn + err);
+			}
+
+			std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+
+			for (const auto& shape : shapes)
+			{
+				for (const auto& index : shape.mesh.indices)
+				{
+					Vertex vertex{};
+
+					vertex.pos = {
+						attrib.vertices[3 * index.vertex_index + 0],
+						attrib.vertices[3 * index.vertex_index + 1],
+						attrib.vertices[3 * index.vertex_index + 2],
+					};
+
+					vertex.texCoord = {
+						attrib.texcoords[2 * index.texcoord_index + 0],
+						1.0f - attrib.texcoords[2 * index.texcoord_index + 1],
+					};
+
+					vertex.color = {1.0f, 1.0f, 1.0f};
+
+					auto [it, inserted] = uniqueVertices.insert({ vertex, static_cast<uint32_t>(vertices.size()) });
+					if (inserted)
+					{
+						vertices.push_back(vertex);
+					}
+
+					indices.push_back(it->second);
+				}
+			}
 		}
 
 		void createCommandBuffers()
@@ -1244,7 +1299,7 @@ namespace fluffy_fox::rendering
 			commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
 			commandBuffer.bindVertexBuffers(0, *vertexBuffer, {0});
-			commandBuffer.bindIndexBuffer(*indexBuffer, 0, vk::IndexType::eUint16);
+			commandBuffer.bindIndexBuffer(*indexBuffer, 0, vk::IndexTypeValue<decltype(indices)::value_type>::value);
 
 			vk::Viewport viewport {
 				.x = 0.0f,
@@ -1488,6 +1543,7 @@ namespace fluffy_fox::rendering
 			createTextureImage();
 			createTextureImageView();
 			createTextureSampler();
+			loadModel();
 			createVertexBuffer();
 			createIndexBuffer();
 			createUniformBuffers();

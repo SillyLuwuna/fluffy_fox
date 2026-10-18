@@ -82,6 +82,9 @@ endforeach()
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE ${THIRD_PARTY_DIR}/stb)
 
+add_library(tinyobjloader INTERFACE)
+target_include_directories(tinyobjloader INTERFACE ${THIRD_PARTY_DIR}/tinyobjloader)
+
 target_link_libraries(${LIB} PUBLIC
 	event
 	event_core
@@ -94,6 +97,7 @@ target_link_libraries(${LIB} PUBLIC
 	spdlog
 #	hwinfo
 	stb
+	tinyobjloader
 )
 
 # shaders
@@ -143,7 +147,7 @@ target_compile_options(${BIN} PRIVATE
 	-Wall
 	-Wextra
 	-Wpedantic
-	-O0
+	-O2
 )
 
 # tests
