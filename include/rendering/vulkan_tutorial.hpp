@@ -157,6 +157,11 @@ namespace fluffy_fox::rendering
 
 		bool framebufferResized = false;
 
+		vk::SampleCountFlagBits msaaSamples = vk::SampleCountFlagBits::e1;
+		vk::raii::Image colorImage = nullptr;
+		vk::raii::DeviceMemory colorImageMemory = nullptr;
+		vk::raii::ImageView colorImageView = nullptr;
+
 		static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(
 			vk::DebugUtilsMessageSeverityFlagBitsEXT, // severity
 			vk::DebugUtilsMessageTypeFlagsEXT type,
@@ -345,6 +350,8 @@ namespace fluffy_fox::rendering
 			}
 
 			physicalDevice = chosen;
+			msaaSamples = getMaxUsableSampleCount(); // TODO change location
+			
 		}
 
 		void createLogicalDevice()
@@ -375,10 +382,13 @@ namespace fluffy_fox::rendering
 				vk::PhysicalDeviceVulkan13Features,
 				vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
 			> featureChain = {
-				{.features = { .samplerAnisotropy = true }},
-				{.shaderDrawParameters = true},
-				{.synchronization2 = true, .dynamicRendering = true },
-				{.extendedDynamicState = true}
+				{.features = {
+					 .sampleRateShading = true, // PERF slow, but better quality multisampling
+					 .samplerAnisotropy = true,
+				}}, // Features2
+				{.shaderDrawParameters = true}, // Vulkan11Features
+				{.synchronization2 = true, .dynamicRendering = true }, // Vulkan13Features
+				{.extendedDynamicState = true} // ExtendedDynamicStateFeaturesEXT
 			};
 
 			std::vector<const char*> requiredDeviceExtension = {
@@ -609,8 +619,9 @@ namespace fluffy_fox::rendering
 			};
 
 			vk::PipelineMultisampleStateCreateInfo multisampling {
-				.rasterizationSamples = vk::SampleCountFlagBits::e1,
-				.sampleShadingEnable = false
+				.rasterizationSamples = msaaSamples,
+				.sampleShadingEnable = true, // PERF slow but better quality
+				.minSampleShading = 0.2f
 			};
 
 			vk::PipelineDepthStencilStateCreateInfo depthStencil {
@@ -720,6 +731,29 @@ namespace fluffy_fox::rendering
 			commandPool = vk::raii::CommandPool(device, poolInfo);
 		}
 
+		void createColorResources()
+		{
+			vk::Format colorFormat = swapChainSurfaceFormat.format;
+
+			std::tie(colorImage, colorImageMemory) = createImage(
+				swapChainExtent.width,
+				swapChainExtent.height,
+				1,
+				msaaSamples,
+				colorFormat,
+				vk::ImageTiling::eOptimal,
+				vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eColorAttachment,
+				vk::MemoryPropertyFlagBits::eDeviceLocal
+			);
+
+			colorImageView = createImageView(
+				colorImage,
+				colorFormat,
+				vk::ImageAspectFlagBits::eColor,
+				1
+			);
+		}
+
 		void createDepthResources()
 		{
 			vk::Format depthFormat = findDepthFormat();
@@ -727,6 +761,7 @@ namespace fluffy_fox::rendering
 				swapChainExtent.width,
 				swapChainExtent.height,
 				1,
+				msaaSamples,
 				depthFormat,
 				vk::ImageTiling::eOptimal,
 				vk::ImageUsageFlagBits::eDepthStencilAttachment,
@@ -795,6 +830,7 @@ namespace fluffy_fox::rendering
 				texWidth,
 				texHeight,
 				mipLevels,
+				vk::SampleCountFlagBits::e1,
 				vk::Format::eR8G8B8A8Srgb,
 				vk::ImageTiling::eOptimal,
 				vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
@@ -921,6 +957,7 @@ namespace fluffy_fox::rendering
 			uint32_t width,
 			uint32_t height,
 			uint32_t mipLevels,
+			vk::SampleCountFlagBits numSamples,
 			vk::Format format,
 			vk::ImageTiling tiling,
 			vk::ImageUsageFlags usage,
@@ -933,7 +970,7 @@ namespace fluffy_fox::rendering
 				.extent = {width, height, 1},
 				.mipLevels = mipLevels,
 				.arrayLayers = 1,
-				.samples = vk::SampleCountFlagBits::e1,
+				.samples = numSamples,
 				.tiling = tiling,
 				.usage = usage,
 				.sharingMode = vk::SharingMode::eExclusive
@@ -1371,6 +1408,18 @@ namespace fluffy_fox::rendering
 
 			transition_image_layout(
 				commandBuffer,
+				*colorImage,
+				vk::ImageLayout::eUndefined,
+				vk::ImageLayout::eColorAttachmentOptimal,
+				vk::AccessFlagBits2::eColorAttachmentWrite,
+				vk::AccessFlagBits2::eColorAttachmentWrite,
+				vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				vk::ImageAspectFlagBits::eColor
+			);
+
+			transition_image_layout(
+				commandBuffer,
 				*depthImage,
 				vk::ImageLayout::eUndefined,
 				vk::ImageLayout::eDepthAttachmentOptimal,
@@ -1384,9 +1433,12 @@ namespace fluffy_fox::rendering
 			vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
 			vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
 
-			vk::RenderingAttachmentInfo attachmentInfo = {
-				.imageView = swapChainImageViews[imageIndex],
+			vk::RenderingAttachmentInfo colorAttachmentInfo = {
+				.imageView = colorImageView,
 				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.resolveMode = vk::ResolveModeFlagBits::eAverage,
+				.resolveImageView = swapChainImageViews[imageIndex],
+				.resolveImageLayout = vk::ImageLayout::eColorAttachmentOptimal,
 				.loadOp = vk::AttachmentLoadOp::eClear,
 				.storeOp = vk::AttachmentStoreOp::eStore,
 				.clearValue = clearColor
@@ -1407,7 +1459,7 @@ namespace fluffy_fox::rendering
 				},
 				.layerCount = 1,
 				.colorAttachmentCount = 1,
-				.pColorAttachments = &attachmentInfo,
+				.pColorAttachments = &colorAttachmentInfo,
 				.pDepthAttachment = &depthAttachmentInfo
 			};
 
@@ -1608,6 +1660,25 @@ namespace fluffy_fox::rendering
 			memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 		}
 
+		vk::SampleCountFlagBits getMaxUsableSampleCount()
+		{
+			// PERF might not be the best idea to choose the highest possible
+			vk::PhysicalDeviceProperties physicalDeviceProperties = physicalDevice.getProperties();
+
+			vk::SampleCountFlags counts =
+				physicalDeviceProperties.limits.framebufferColorSampleCounts &
+				physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+
+			if (counts & vk::SampleCountFlagBits::e64) { return vk::SampleCountFlagBits::e64; }
+			if (counts & vk::SampleCountFlagBits::e32) { return vk::SampleCountFlagBits::e32; }
+			if (counts & vk::SampleCountFlagBits::e16) { return vk::SampleCountFlagBits::e16; }
+			if (counts & vk::SampleCountFlagBits::e8) { return vk::SampleCountFlagBits::e8; }
+			if (counts & vk::SampleCountFlagBits::e4) { return vk::SampleCountFlagBits::e4; }
+			if (counts & vk::SampleCountFlagBits::e2) { return vk::SampleCountFlagBits::e2; }
+
+			return vk::SampleCountFlagBits::e1;
+		}
+
 		void cleanupSwapChain()
 		{
 			swapChainImageViews.clear();
@@ -1626,6 +1697,7 @@ namespace fluffy_fox::rendering
 
 			createSwapChain();
 			createImageViews();
+			createColorResources();
 			createDepthResources();
 		}
 
@@ -1656,6 +1728,7 @@ namespace fluffy_fox::rendering
 			createDescriptorSetLayout();
 			createGraphicsPipeline();
 			createCommandPool();
+			createColorResources();
 			createDepthResources();
 			createTextureImage();
 			createTextureImageView();

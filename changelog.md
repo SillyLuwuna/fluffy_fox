@@ -1,6 +1,10 @@
 # Changelog
 
 ## [v0.0.8] 2026-10-18
+### Added
+- mipmaps
+- multisampling
+
 ### Changed
 - dependencies (removed libevent, bgfx, hwinfo) (added fluff)
 - moved code to library fluff
