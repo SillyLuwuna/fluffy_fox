@@ -139,6 +139,7 @@ namespace fluffy_fox::rendering
 		std::vector<vk::raii::DeviceMemory> uniformBuffersMemory;
 		std::vector<void*> uniformBuffersMapped;
 
+		uint32_t mipLevels = 0;
 		vk::raii::Image textureImage = nullptr;
 		vk::raii::DeviceMemory textureImageMemory = nullptr;
 		vk::raii::ImageView textureImageView = nullptr;
@@ -502,7 +503,7 @@ namespace fluffy_fox::rendering
 
 			for (auto& image : swapChainImages)
 			{
-				swapChainImageViews.emplace_back(createImageView(image, swapChainSurfaceFormat.format, vk::ImageAspectFlagBits::eColor));
+				swapChainImageViews.emplace_back(createImageView(image, swapChainSurfaceFormat.format, vk::ImageAspectFlagBits::eColor, 1));
 			}
 		}
 
@@ -725,12 +726,13 @@ namespace fluffy_fox::rendering
 			std::tie(depthImage, depthImageMemory) = createImage(
 				swapChainExtent.width,
 				swapChainExtent.height,
+				1,
 				depthFormat,
 				vk::ImageTiling::eOptimal,
 				vk::ImageUsageFlagBits::eDepthStencilAttachment,
 				vk::MemoryPropertyFlagBits::eDeviceLocal
 			);
-			depthImageView = createImageView(depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth);
+			depthImageView = createImageView(depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth, 1);
 		}
 
 		vk::Format findDepthFormat()
@@ -764,9 +766,13 @@ namespace fluffy_fox::rendering
 
 		void createTextureImage()
 		{
-			int texWidth, texHeight, texChannels;
+			int texWidth = 0;
+			int texHeight = 0;
+			int texChannels = 0;
+
 			stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 			vk::DeviceSize imageSize = texWidth * texHeight * 4;
+			mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
 
 			if (!pixels)
 			{
@@ -788,23 +794,133 @@ namespace fluffy_fox::rendering
 			std::tie(textureImage, textureImageMemory) = createImage(
 				texWidth,
 				texHeight,
+				mipLevels,
 				vk::Format::eR8G8B8A8Srgb,
 				vk::ImageTiling::eOptimal,
-				vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+				vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
 				vk::MemoryPropertyFlagBits::eDeviceLocal
 			);
 
 			vk::raii::CommandBuffer commandBuffer = beginSingleTimeCommands();
-			transitionImageLayout(commandBuffer, textureImage, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+			transitionImageLayout(commandBuffer, textureImage, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, mipLevels);
 			copyBufferToImage(commandBuffer, stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
 
-			transitionImageLayout(commandBuffer, textureImage, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+			// transitioned to vk::ImageLayout::eShaderReadOnlyOptimal while generating mipmaps
+			generateMipmaps(commandBuffer, textureImage, vk::Format::eR8G8B8A8Srgb, texWidth, texHeight, mipLevels);
 			endSingleTimeCommands(std::move(commandBuffer));
+		}
+
+		void generateMipmaps(
+			vk::raii::CommandBuffer& commandBuffer,
+			vk::raii::Image& image,
+			vk::Format imageFormat,
+			int32_t texWidth,
+			int32_t texHeight,
+			uint32_t mipLevels
+		)
+		{
+			// PERF usually done once and stored. Not generated each time.
+
+			vk::FormatProperties formatProperties = physicalDevice.getFormatProperties(imageFormat);
+			if (!(formatProperties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear))
+			{
+				throw std::runtime_error("texture image format does not support linear blitting!");
+			}
+
+			vk::ImageMemoryBarrier barrier = {
+				.srcAccessMask = vk::AccessFlagBits::eTransferWrite,
+				.dstAccessMask = vk::AccessFlagBits::eTransferRead,
+				.oldLayout = vk::ImageLayout::eTransferDstOptimal,
+				.newLayout = vk::ImageLayout::eTransferSrcOptimal,
+				.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+				.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+				.image = image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.levelCount = 1,
+					.layerCount = 1
+				}
+			};
+
+			int32_t mipWidth = texWidth;
+			int32_t mipHeight = texHeight;
+
+			for (uint32_t i = 1; i < mipLevels; i++)
+			{
+				barrier.subresourceRange.baseMipLevel = i - 1;
+				barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+				barrier.newLayout = vk::ImageLayout::eTransferSrcOptimal;
+				barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+				barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+
+				commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, barrier);
+
+				vk::ImageBlit blit = {
+					.srcSubresource = {
+						.aspectMask = vk::ImageAspectFlagBits::eColor,
+						.mipLevel = i - 1,
+						.layerCount = 1
+					},
+					.srcOffsets = std::array<vk::Offset3D, 2>({ { }, {
+							mipWidth,
+							mipHeight,
+							1
+						}
+					}),
+					.dstSubresource = {
+						.aspectMask = vk::ImageAspectFlagBits::eColor,
+						.mipLevel = i,
+						.layerCount = 1
+					},
+					.dstOffsets = std::array<vk::Offset3D, 2>({
+						{ },
+						{
+							1 < mipWidth ? mipWidth / 2 : 1,
+							1 < mipHeight ? mipHeight / 2 : 1,
+							1
+						}
+					})
+				};
+
+				commandBuffer.blitImage(
+					image,
+					vk::ImageLayout::eTransferSrcOptimal,
+					image,
+					vk::ImageLayout::eTransferDstOptimal,
+					blit,
+					vk::Filter::eLinear
+				);
+
+				barrier.oldLayout = vk::ImageLayout::eTransferSrcOptimal;
+				barrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+				barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
+				barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+
+				commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader, {}, {}, {}, barrier);
+
+				if (1 < mipWidth)
+				{
+					mipWidth /= 2;
+				}
+				if (1 < mipHeight)
+				{
+					mipHeight /= 2;
+				}
+			}
+
+			barrier.subresourceRange.baseMipLevel = mipLevels - 1;
+			barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+			barrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+			barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+			barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+
+			commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader, {}, {}, {}, barrier);
 		}
 
 		std::pair<vk::raii::Image, vk::raii::DeviceMemory> createImage(
 			uint32_t width,
 			uint32_t height,
+			uint32_t mipLevels,
 			vk::Format format,
 			vk::ImageTiling tiling,
 			vk::ImageUsageFlags usage,
@@ -815,7 +931,7 @@ namespace fluffy_fox::rendering
 				.imageType = vk::ImageType::e2D,
 				.format = format,
 				.extent = {width, height, 1},
-				.mipLevels = 1,
+				.mipLevels = mipLevels,
 				.arrayLayers = 1,
 				.samples = vk::SampleCountFlagBits::e1,
 				.tiling = tiling,
@@ -868,7 +984,8 @@ namespace fluffy_fox::rendering
 			vk::raii::CommandBuffer& commandBuffer,
 			const vk::raii::Image& image,
 			vk::ImageLayout oldLayout,
-			vk::ImageLayout newLayout
+			vk::ImageLayout newLayout,
+			uint32_t mipLevels
 		)
 		{
 			vk::ImageMemoryBarrier barrier {
@@ -879,7 +996,7 @@ namespace fluffy_fox::rendering
 				.image = image,
 				.subresourceRange = {
 					.aspectMask = vk::ImageAspectFlagBits::eColor,
-					.levelCount = 1,
+					.levelCount = mipLevels,
 					.layerCount = 1
 				}
 			};
@@ -938,10 +1055,10 @@ namespace fluffy_fox::rendering
 
 		void createTextureImageView()
 		{
-			textureImageView = createImageView(*textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
+			textureImageView = createImageView(*textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor, mipLevels);
 		}
 
-		vk::raii::ImageView createImageView(vk::Image const& image, vk::Format format, vk::ImageAspectFlags aspectFlags)
+		vk::raii::ImageView createImageView(vk::Image const& image, vk::Format format, vk::ImageAspectFlags aspectFlags, uint32_t mipLevels) const
 		{
 			vk::ImageViewCreateInfo viewInfo {
 				.image = image,
@@ -956,7 +1073,7 @@ namespace fluffy_fox::rendering
 				.subresourceRange = {
 					.aspectMask = aspectFlags,
 					.baseMipLevel = 0,
-					.levelCount = 1,
+					.levelCount = mipLevels,
 					.baseArrayLayer = 0,
 					.layerCount = 1,
 				}
@@ -970,19 +1087,19 @@ namespace fluffy_fox::rendering
 			vk::PhysicalDeviceProperties properties = physicalDevice.getProperties();
 
 			vk::SamplerCreateInfo samplerInfo {
-				.magFilter = vk::Filter::eLinear,
-				.minFilter = vk::Filter::eLinear,
-				.mipmapMode = vk::SamplerMipmapMode::eLinear,
+				.magFilter = vk::Filter::eLinear, // when close to camera, magnify
+				.minFilter = vk::Filter::eLinear, // when far away from camera, minify
+				.mipmapMode = vk::SamplerMipmapMode::eLinear, // eNearest to select nearest mipmap, eLinear to interpolate between the two with the Filters
 				.addressModeU = vk::SamplerAddressMode::eRepeat,
 				.addressModeV = vk::SamplerAddressMode::eRepeat,
 				.addressModeW = vk::SamplerAddressMode::eRepeat,
-				.mipLodBias = 0.0f,
+				.mipLodBias = 0.0f, // bias for mipmap selection
 				.anisotropyEnable = true,
-				.maxAnisotropy = properties.limits.maxSamplerAnisotropy, // PERF slow
+				.maxAnisotropy = properties.limits.maxSamplerAnisotropy, // PERF slow, could select a lower value
 				.compareEnable = false,
 				.compareOp = vk::CompareOp::eAlways,
 				.minLod = 0.0f,
-				.maxLod = 0.0f,
+				.maxLod = vk::LodClampNone, // 0.0f to disable
 				.borderColor = vk::BorderColor::eIntOpaqueBlack,
 				.unnormalizedCoordinates = false,
 			};
