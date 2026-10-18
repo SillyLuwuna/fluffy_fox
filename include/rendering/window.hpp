@@ -1,8 +1,7 @@
 #pragma once
 
-#include "events/event.hpp"
+#include <fluff/events.hpp>
 #include <GLFW/glfw3.h>
-// #include <GLFW/glfw3native.h>
 #include <string>
 
 namespace fluffy_fox::rendering
@@ -16,8 +15,8 @@ namespace fluffy_fox::rendering
 		uint16_t height_;
 		GLFWwindow* window_;
 		Renderer* attached_renderer_;
-		Event<int32_t, int32_t> resize_event_;
-		Event<bool> focus_event_;
+		fluff::Event<int32_t, int32_t> resize_event_;
+		fluff::Event<bool> focus_event_;
 		bool waiting_for_focus_;
 
 		void setup_events();
@@ -37,16 +36,12 @@ namespace fluffy_fox::rendering
 		uint16_t width() const;
 		uint16_t height() const;
 
-		// void* get_platform_window() const;
-		// void* get_platform_display() const;
-		// bool is_wayland() const;
-
 		void start_event_loop();
 		void attach_renderer(Renderer& renderer);
 		void detach_renderer();
 
-		Event<int32_t, int32_t>& resize_event();
-		Event<bool>& focus_event();
+		fluff::Event<int32_t, int32_t>& resize_event();
+		fluff::Event<bool>& focus_event();
 
 		void block_while_minimized();
 		void block_while_unfocused();

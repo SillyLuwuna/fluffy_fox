@@ -1,18 +1,3 @@
-[submodule "lib/libevent"]
-	path = third_party/libevent
-	url = https://github.com/libevent/libevent.git
-[submodule "lib/bgfx"]
-	path = third_party/bgfx
-	url = https://github.com/bkaradzic/bgfx.cmake.git
-[submodule "lib/glfw"]
-	path = third_party/glfw
-	url = https://github.com/glfw/glfw.git
-[submodule "lib/spdlog"]
-	path = third_party/spdlog
-	url = https://github.com/gabime/spdlog.git
-[submodule "lib/hwinfo"]
-	path = third_party/hwinfo
-	url = https://github.com/lfreist/hwinfo.git
 [submodule "third_party/tinygltf"]
 	path = third_party/tinygltf
 	url = https://github.com/syoyo/tinygltf.git
@@ -22,3 +7,12 @@
 [submodule "third_party/stb"]
 	path = third_party/stb
 	url = https://github.com/nothings/stb.git
+[submodule "third_party/glfw"]
+	path = third_party/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "third_party/spdlog"]
+	path = third_party/spdlog
+	url = https://github.com/gabime/spdlog.git
+[submodule "third_party/fluff"]
+	path = third_party/fluff
+	url = https://github.com/SillyLuwuna/fluff.git

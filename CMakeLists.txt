@@ -44,10 +44,6 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
 # set(GLFW_BUILD_WAYLAND ON CACHE BOOL "" FORCE)
 
-set(BGFX_BUILD_TOOLS ON CACHE BOOL "" FORCE)
-set(BGFX_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(BGFX_INSTALL OFF CACHE BOOL "" FORCE)
-
 set(EVENT__LIBRARY_TYPE "STATIC" CACHE STRING "" FORCE)
 
 target_compile_definitions(${LIB} INTERFACE
@@ -57,27 +53,11 @@ target_compile_definitions(${LIB} INTERFACE
 )
 
 # libraries
-add_subdirectory(${THIRD_PARTY_DIR}/libevent)
-# add_subdirectory(${THIRD_PARTY_DIR}/bgfx)
 add_subdirectory(${THIRD_PARTY_DIR}/glfw)
 add_subdirectory(${THIRD_PARTY_DIR}/spdlog)
-# add_subdirectory(${THIRD_PARTY_DIR}/hwinfo)
 add_subdirectory(${THIRD_PARTY_DIR}/tinygltf)
 add_subdirectory(${THIRD_PARTY_DIR}/glm)
-
-# libevent bugfix on newer gcc versions
-get_property(libevent_targets DIRECTORY ${THIRD_PARTY_DIR}/libevent PROPERTY BUILDSYSTEM_TARGETS)
-foreach(tgt ${libevent_targets})
-    get_target_property(tgt_type ${tgt} TYPE)
-    if(tgt_type STREQUAL "STATIC_LIBRARY" OR
-       tgt_type STREQUAL "SHARED_LIBRARY" OR
-       tgt_type STREQUAL "MODULE_LIBRARY" OR
-       tgt_type STREQUAL "EXECUTABLE" OR
-       tgt_type STREQUAL "OBJECT_LIBRARY")
-	   target_compile_definitions(${tgt} PRIVATE _GNU_SOURCE)
-       target_compile_options(${tgt} PRIVATE -include limits.h)
-    endif()
-endforeach()
+add_subdirectory(${THIRD_PARTY_DIR}/fluff)
 
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE ${THIRD_PARTY_DIR}/stb)
@@ -86,18 +66,13 @@ add_library(tinyobjloader INTERFACE)
 target_include_directories(tinyobjloader INTERFACE ${THIRD_PARTY_DIR}/tinyobjloader)
 
 target_link_libraries(${LIB} PUBLIC
-	event
-	event_core
-	event_extra
-	event_pthreads
 	pthread
-#	bgfx
 	Vulkan::Vulkan
 	glfw
 	spdlog
-#	hwinfo
 	stb
 	tinyobjloader
+	fluff
 )
 
 # shaders

@@ -3,10 +3,12 @@
 
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
+#include <fluff/events.hpp>
 
 #include "rendering/window.hpp"
 #include "spdlog/spdlog.h"
 #include "rendering/renderer.hpp"
+
 
 using namespace fluffy_fox::rendering;
 
@@ -179,12 +181,12 @@ void Window::detach_renderer()
 	attached_renderer_ = nullptr;
 }
 
-fluffy_fox::Event<int32_t, int32_t>& Window::resize_event()
+fluff::Event<int32_t, int32_t>& Window::resize_event()
 {
 	return resize_event_;
 }
 
-fluffy_fox::Event<bool>& Window::focus_event()
+fluff::Event<bool>& Window::focus_event()
 {
 	return focus_event_;
 }
