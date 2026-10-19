@@ -10,15 +10,15 @@
 #include <glm/gtx/hash.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
 // #define TINYOBJLOADER_IMPLEMENTATION
 // #include <tiny_obj_loader.h>
-// #define TINYGLTF_IMPLEMENTATION
-// #define STB_IMAGE_WRITE_IMPLEMENTATION
+#define TINYGLTF3_ENABLE_STB_IMAGE
+#define TINYGLTF3_ENABLE_STB_IMAGE_WRITE
 #define TINYGLTF3_ENABLE_FS
 #define TINYGLTF3_IMPLEMENTATION
 #include <tiny_gltf_v3.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 #include "rendering/window.hpp"
 
@@ -26,8 +26,12 @@ namespace fluffy_fox::rendering
 {
 	constexpr uint32_t WIDTH = 800;
 	constexpr uint32_t HEIGHT = 600;
-	const std::string MODEL_PATH = "models/viking_room.gltf";
+	// const std::string MODEL_PATH = "models/viking_room.gltf";
+	const std::string MODEL_PATH = "models/source/kiu_1015162433_texture.glb";
+	// const std::string MODEL_PATH = "models/source/ip-splatoon__marina__furry__sexy.glb";
+	// const std::string MODEL_PATH = "models/lowpoly_fox.glb";
 	const std::string TEXTURE_PATH = "textures/viking_room.png";
+	const bool USE_MODEL_TEXTURE = true;
 
 	constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -93,6 +97,14 @@ namespace fluffy_fox::rendering
 		alignas(16) glm::mat4 proj;
 	};
 
+	struct DecodedImage
+	{
+		std::unique_ptr<uint8_t[]> pixels;
+		int width;
+		int height;
+		int channels;
+		uint64_t bytes;
+	};
 }
 
 namespace std
@@ -149,6 +161,8 @@ namespace fluffy_fox::rendering
 		vk::raii::DeviceMemory textureImageMemory = nullptr;
 		vk::raii::ImageView textureImageView = nullptr;
 		vk::raii::Sampler textureSampler = nullptr;
+		bool hasTextureDecoded = false;
+		DecodedImage textureDecoded;
 
 		vk::raii::Image depthImage = nullptr;
 		vk::raii::DeviceMemory depthImageMemory = nullptr;
@@ -806,34 +820,44 @@ namespace fluffy_fox::rendering
 
 		void createTextureImage()
 		{
-			int texWidth = 0;
-			int texHeight = 0;
-			int texChannels = 0;
-
-			stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-			vk::DeviceSize imageSize = texWidth * texHeight * 4;
-			mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
-
-			if (!pixels)
+			if (!USE_MODEL_TEXTURE)
 			{
-				throw std::runtime_error("failed to load texture image!");
+				// TODO move into model load
+				stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &textureDecoded.width, &textureDecoded.height, &textureDecoded.channels, STBI_rgb_alpha);
+
+				if (!pixels)
+				{
+					throw std::runtime_error("failed to load texture image!");
+				}
+
+				textureDecoded.bytes = textureDecoded.width * textureDecoded.height * 4; // TODO put this in struct method
+				textureDecoded.pixels = std::make_unique<uint8_t[]>(textureDecoded.bytes);
+				memcpy(textureDecoded.pixels.get(), pixels, textureDecoded.bytes);
+
+				stbi_image_free(pixels);
+			}
+			else
+			{
+				if (!hasTextureDecoded)
+				{
+					throw std::runtime_error("failed to load texture image!");
+				}
 			}
 
+			mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(textureDecoded.width, textureDecoded.height)))) + 1;
 			auto [stagingBuffer, stagingBufferMemory] = createBuffer(
-				imageSize,
+				textureDecoded.bytes,
 				vk::BufferUsageFlagBits::eTransferSrc,
 				vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
 			);
 
-			void* data = stagingBufferMemory.mapMemory(0, imageSize);
-			memcpy(data, pixels, imageSize);
+			void* data = stagingBufferMemory.mapMemory(0, textureDecoded.bytes);
+			memcpy(data, textureDecoded.pixels.get(), textureDecoded.bytes);
 			stagingBufferMemory.unmapMemory();
 
-			stbi_image_free(pixels);
-
 			std::tie(textureImage, textureImageMemory) = createImage(
-				texWidth,
-				texHeight,
+				textureDecoded.width,
+				textureDecoded.height,
 				mipLevels,
 				vk::SampleCountFlagBits::e1,
 				vk::Format::eR8G8B8A8Srgb,
@@ -844,10 +868,10 @@ namespace fluffy_fox::rendering
 
 			vk::raii::CommandBuffer commandBuffer = beginSingleTimeCommands();
 			transitionImageLayout(commandBuffer, textureImage, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, mipLevels);
-			copyBufferToImage(commandBuffer, stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+			copyBufferToImage(commandBuffer, stagingBuffer, textureImage, static_cast<uint32_t>(textureDecoded.width), static_cast<uint32_t>(textureDecoded.height));
 
 			// transitioned to vk::ImageLayout::eShaderReadOnlyOptimal while generating mipmaps
-			generateMipmaps(commandBuffer, textureImage, vk::Format::eR8G8B8A8Srgb, texWidth, texHeight, mipLevels);
+			generateMipmaps(commandBuffer, textureImage, vk::Format::eR8G8B8A8Srgb, textureDecoded.width, textureDecoded.height, mipLevels);
 			endSingleTimeCommands(std::move(commandBuffer));
 		}
 
@@ -1169,7 +1193,7 @@ namespace fluffy_fox::rendering
 
 			vertices.clear();
 			indices.clear();
-
+			
 			for (uint32_t mesh_idx = 0; mesh_idx < model->meshes_count; mesh_idx++)
 			{
 				const tg3_mesh& mesh = model->meshes[mesh_idx];
@@ -1178,7 +1202,7 @@ namespace fluffy_fox::rendering
 					const tg3_primitive& primitive = mesh.primitives[primitive_idx];
 					if (primitive.mode == TG3_MODE_TRIANGLES || primitive.mode == -1)
 					{
-						my_tg3_load_primitive(model.get(), primitive, vertices, indices);
+						my_tg3_load_primitive(model.get(), primitive, vertices, indices, &textureDecoded, hasTextureDecoded);
 					}
 				}
 			}
@@ -1188,7 +1212,9 @@ namespace fluffy_fox::rendering
 			const tg3_model* model,
 			const tg3_primitive& primitive,
 			std::vector<Vertex>& vertices,
-			std::vector<uint32_t>& indices
+			std::vector<uint32_t>& indices,
+			DecodedImage* texture,
+			bool& texture_load_success
 		)
 		{
 			int32_t pos_accessor = my_tg3_find_attribute(primitive, "POSITION");
@@ -1210,6 +1236,8 @@ namespace fluffy_fox::rendering
 			std::unordered_map<Vertex, uint32_t> unique_vertices;
 			const bool has_indices = primitive.indices != TG3_INDEX_NONE;
 
+			std::cout << std::to_string(primitive.mode == TG3_MODE_TRIANGLES) << "\n";
+
 			for (size_t i = 0; i < vertex_count; i++)
 			{
 				Vertex vertex{};
@@ -1219,17 +1247,27 @@ namespace fluffy_fox::rendering
 					memcpy(&vertex.texCoord, &uv[i * 2], 2 * sizeof(float));
 				}
 
-				vertex.texCoord[1] = 1.0f - vertex.texCoord[1]; // inverted
+				// inversion from Y-up to Z-up same would have to be applied to normals
+				// FIXME maybe change vulkan itself?
+				float tmp = vertex.pos[1];
+				vertex.pos[1] = -vertex.pos[2];
+				vertex.pos[2] = tmp;
 
-				auto [it, inserted] = unique_vertices.insert({ vertex, static_cast<uint32_t>(vertices.size()) });
-				if (inserted)
-				{
-					vertices.push_back(vertex);
-				}
+				// vertex.texCoord[1] = 1.0f - vertex.texCoord[1]; // inverted // FIXME some textures need this, some don't
 
 				if (!has_indices)
 				{
+					auto [it, inserted] = unique_vertices.insert({ vertex, static_cast<uint32_t>(vertices.size()) });
+					if (inserted)
+					{
+						vertices.push_back(vertex);
+					}
+
 					indices.push_back(it->second);
+				}
+				else
+				{
+					vertices.push_back(vertex);
 				}
 			}
 
@@ -1243,10 +1281,93 @@ namespace fluffy_fox::rendering
 				}
 			}
 
-			std::cout << std::to_string(indices.size()) << "\n";
-			std::cout << std::to_string(vertices.size()) << "\n";
+			const tg3_image* image = my_tg3_get_texture_image(*model, primitive);
+			if (image != nullptr)
+			{
+				*texture = my_tg3_decode_image(*model, *image, "models");
+			}
+
+			texture_load_success = (image != nullptr) && (texture->pixels.get() != nullptr);
+
+			std::cout << "loaded model\n";
+			std::cout << "\tvertices: " << std::to_string(indices.size()) << "\n";
+			std::cout << "\tindices:  " << std::to_string(vertices.size()) << "\n";
 
 			return true;
+		}
+
+		static const tg3_image* my_tg3_get_texture_image(
+			const tg3_model& model,
+			const tg3_primitive& primitive
+		)
+		{
+			if (primitive.material < 0) return nullptr;
+
+			const tg3_material* material = &model.materials[primitive.material];
+			int32_t texture_index = material->pbr_metallic_roughness.base_color_texture.index;
+			if (texture_index < 0) return nullptr;
+
+			const tg3_texture* texture = &model.textures[texture_index];
+			int32_t image_index = texture->source;
+			if (image_index < 0) return nullptr;
+
+			return &model.images[image_index];
+		}
+
+		static DecodedImage my_tg3_decode_image(const tg3_model& model, const tg3_image& image, const std::string& base_dir)
+		{
+			DecodedImage result {
+				.pixels = nullptr,
+				.width = -1,
+				.height = -1,
+				.channels = -1,
+				.bytes = 0
+			};
+
+			const uint8_t* encoding = nullptr;
+			size_t encoding_size = 0;
+			std::vector<uint8_t> file_bytes;
+
+			if (image.buffer_view >= 0)
+			{
+				const tg3_buffer_view& buffer_view = model.buffer_views[image.buffer_view];
+				const tg3_buffer& buffer = model.buffers[buffer_view.buffer];
+				encoding = buffer.data.data + buffer_view.byte_offset;
+				encoding_size = (size_t)buffer_view.byte_length;
+			}
+			else if (image.image.count > 0)
+			{
+				encoding = image.image.data;
+				encoding_size = (size_t)image.image.count;
+			}
+			else if (image.uri.len > 0 && !tg3_is_data_uri(image.uri.data, image.uri.len))
+			{
+				std::string path = base_dir + "/" + std::string(image.uri.data, image.uri.len);
+				FILE* file = fopen(path.c_str(), "rb");
+				if (!file) return result;
+				fseek(file, 0, SEEK_END);
+				long file_size = ftell(file);
+				fseek(file, 0, SEEK_SET);
+				file_bytes.resize((size_t)file_size);
+				fread(file_bytes.data(), 1, (size_t)file_size, file);
+				fclose(file);
+				encoding = file_bytes.data();
+				encoding_size = file_bytes.size();
+			}
+
+			if (!encoding) return result;
+
+			// FIXME is num_components really the same as num_channels
+			uint8_t* pixels = stbi_load_from_memory(encoding, (int)encoding_size, &result.width, &result.height, &result.channels, STBI_rgb_alpha);
+
+			// result.bytes = result.width * result.height * result.channels; // channels should be 4 // TODO put this in struct method
+			result.bytes = result.width * result.height * 4; // channels should be 4 // TODO put this in struct method
+			result.pixels = std::make_unique<uint8_t[]>(result.bytes);
+			memcpy(result.pixels.get(), pixels, result.bytes);
+
+			stbi_image_free(pixels);
+
+			return result;
 		}
 
 		static int32_t my_tg3_find_attribute(const tg3_primitive& primitive, const char* name)
@@ -1477,7 +1598,7 @@ namespace fluffy_fox::rendering
 				(uint32_t)accessor.buffer_view >= model->buffer_views_count) return false;
 
 			const tg3_buffer_view& buffer_view = model->buffer_views[accessor.buffer_view];
-			int32_t stride = tg3_accessor_byte_stride(&accessor, &buffer_view);
+			const int32_t stride = tg3_accessor_byte_stride(&accessor, &buffer_view);
 			if (stride <= 0) return false;
 
 			const uint8_t* src = my_tg3_view_data(
@@ -1490,6 +1611,7 @@ namespace fluffy_fox::rendering
 			);
 			if (!src && accessor.count) return false;
 
+			std::cout << std::to_string(accessor.component_type) << "\n";
 			out.resize((size_t)accessor.count);
 			for (uint64_t i = 0; i < accessor.count; i++)
 			{
@@ -1787,6 +1909,7 @@ namespace fluffy_fox::rendering
 				.y = static_cast<float>(swapChainExtent.height), // because of glm, to flip Y coordinate
 				.width = static_cast<float>(swapChainExtent.width),
 				.height = -static_cast<float>(swapChainExtent.height), // minus sign because of glm, which assumes Y coordinate is flipped
+				// .height = static_cast<float>(swapChainExtent.height),
 				.minDepth = 0.0f,
 				.maxDepth = 1.0f
 			};
@@ -2041,10 +2164,10 @@ namespace fluffy_fox::rendering
 			createCommandPool();
 			createColorResources();
 			createDepthResources();
+			loadModel();
 			createTextureImage();
 			createTextureImageView();
 			createTextureSampler();
-			loadModel();
 			createVertexBuffer();
 			createIndexBuffer();
 			createUniformBuffers();

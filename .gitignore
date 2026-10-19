@@ -1,2 +1,4 @@
 /build/**
 /logs/**
+/models/source/
+/models/textures/
