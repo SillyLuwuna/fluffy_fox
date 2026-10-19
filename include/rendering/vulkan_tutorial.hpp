@@ -22,18 +22,26 @@
 
 #include "rendering/window.hpp"
 
+// TODO push constants
+// TODO instancing
+// TODO batch draw calls
+// TODO indirect drawing
+
 namespace fluffy_fox::rendering
 {
 	constexpr uint32_t WIDTH = 800;
 	constexpr uint32_t HEIGHT = 600;
+	constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
+
 	// const std::string MODEL_PATH = "models/viking_room.gltf";
 	const std::string MODEL_PATH = "models/source/kiu_1015162433_texture.glb";
-	// const std::string MODEL_PATH = "models/source/ip-splatoon__marina__furry__sexy.glb";
 	// const std::string MODEL_PATH = "models/lowpoly_fox.glb";
+	// const std::string MODEL_PATH = "models/shiba.glb";
 	const std::string TEXTURE_PATH = "textures/viking_room.png";
 	const bool USE_MODEL_TEXTURE = true;
 
-	constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
+	constexpr int MAX_OBJECTS = 3;
+
 
 	const std::vector<char const*> validationLayers = {
 		"VK_LAYER_KHRONOS_validation"
@@ -105,6 +113,34 @@ namespace fluffy_fox::rendering
 		int channels;
 		uint64_t bytes;
 	};
+
+	struct GameObject
+	{
+		// transform properties
+		glm::vec3 position = { 0.0f, 0.0f, 0.0f };
+		glm::vec3 rotation = { 0.0f, 0.0f, 0.0f };
+		glm::vec3 scale = { 1.0f, 1.0f, 1.0f };
+
+		// uniform buffer for this object (one per frame in flight)
+		std::vector<vk::raii::Buffer> uniformBuffers;
+		std::vector<vk::raii::DeviceMemory> uniformBuffersMemory;
+		std::vector<void*> uniformBuffersMapped;
+
+		// descriptor sets for this object (one per frame in flight)
+		std::vector<vk::raii::DescriptorSet> descriptorSets;
+
+		// calculate model matrix based on position, rotation and scale
+		glm::mat4 getModelMatrix() const
+		{
+			glm::mat4 model = glm::mat4(1.0f);
+			model = glm::translate(model, position);
+			model = glm::rotate(model, rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
+			model = glm::rotate(model, rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+			model = glm::rotate(model, rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+			model = glm::scale(model, scale);
+			return model;
+		}
+	};
 }
 
 namespace std
@@ -150,11 +186,6 @@ namespace fluffy_fox::rendering
 		vk::raii::DeviceMemory indexBufferMemory = nullptr;
 
 		vk::raii::DescriptorPool descriptorPool = nullptr;
-		std::vector<vk::raii::DescriptorSet> descriptorSets;
-
-		std::vector<vk::raii::Buffer> uniformBuffers;
-		std::vector<vk::raii::DeviceMemory> uniformBuffersMemory;
-		std::vector<void*> uniformBuffersMapped;
 
 		uint32_t mipLevels = 0;
 		vk::raii::Image textureImage = nullptr;
@@ -180,6 +211,8 @@ namespace fluffy_fox::rendering
 		vk::raii::Image colorImage = nullptr;
 		vk::raii::DeviceMemory colorImageMemory = nullptr;
 		vk::raii::ImageView colorImageView = nullptr;
+
+		std::array<GameObject, MAX_OBJECTS> gameObjects;
 
 		static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(
 			vk::DebugUtilsMessageSeverityFlagBitsEXT, // severity
@@ -1249,6 +1282,7 @@ namespace fluffy_fox::rendering
 
 				// inversion from Y-up to Z-up same would have to be applied to normals
 				// FIXME maybe change vulkan itself?
+				// maybe check somehow what axis the model uses
 				float tmp = vertex.pos[1];
 				vertex.pos[1] = -vertex.pos[2];
 				vertex.pos[2] = tmp;
@@ -1621,6 +1655,21 @@ namespace fluffy_fox::rendering
 			return true;
 		}
 
+		void setupGameObjects()
+		{
+			gameObjects[0].position = {0.0f, 0.0f, 0.0f};
+			gameObjects[0].rotation = {0.0f, 0.0f, 0.0f};
+			gameObjects[0].scale = {1.0f, 1.0f, 1.0f};
+
+			gameObjects[1].position = {-2.0f, 0.0f, -1.0f};
+			gameObjects[1].rotation = {0.0f, glm::radians(45.0f), 0.0f};
+			gameObjects[1].scale = {0.75f, 0.75f, 0.75f};
+
+			gameObjects[2].position = {2.0f, 0.0f, -1.0f};
+			gameObjects[2].rotation = {0.0f, glm::radians(-45.0f), 0.0f};
+			gameObjects[2].scale = {0.75f, 0.75f, 0.75f};
+		}
+
 		void createCommandBuffers()
 		{
 			vk::CommandBufferAllocateInfo allocInfo {
@@ -1719,17 +1768,24 @@ namespace fluffy_fox::rendering
 
 		void createUniformBuffers()
 		{
-			for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+			for (auto& gameObject : gameObjects)
 			{
-				vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
-				auto [buffer, bufferMem] = createBuffer(
-					bufferSize,
-					vk::BufferUsageFlagBits::eUniformBuffer,
-					vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
-				);
-				uniformBuffers.emplace_back(std::move(buffer));
-				uniformBuffersMemory.emplace_back(std::move(bufferMem));
-				uniformBuffersMapped.emplace_back(uniformBuffersMemory.back().mapMemory(0, bufferSize));
+				gameObject.uniformBuffers.clear();
+				gameObject.uniformBuffersMemory.clear();
+				gameObject.uniformBuffersMapped.clear();
+
+				for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+				{
+					vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
+					auto [buffer, bufferMem] = createBuffer(
+						bufferSize,
+						vk::BufferUsageFlagBits::eUniformBuffer,
+						vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+					);
+					gameObject.uniformBuffers.emplace_back(std::move(buffer));
+					gameObject.uniformBuffersMemory.emplace_back(std::move(bufferMem));
+					gameObject.uniformBuffersMapped.emplace_back(gameObject.uniformBuffersMemory.back().mapMemory(0, bufferSize));
+				}
 			}
 		}
 
@@ -1738,17 +1794,17 @@ namespace fluffy_fox::rendering
 			std::array<vk::DescriptorPoolSize, 2> poolSize {{
 				{
 					.type = vk::DescriptorType::eUniformBuffer,
-					.descriptorCount = MAX_FRAMES_IN_FLIGHT
+					.descriptorCount = MAX_OBJECTS * MAX_FRAMES_IN_FLIGHT
 				},
 				{
 					.type = vk::DescriptorType::eCombinedImageSampler,
-					.descriptorCount = MAX_FRAMES_IN_FLIGHT
+					.descriptorCount = MAX_OBJECTS * MAX_FRAMES_IN_FLIGHT
 				}
 			}};
 
 			vk::DescriptorPoolCreateInfo poolInfo {
 				.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-				.maxSets = MAX_FRAMES_IN_FLIGHT,
+				.maxSets = MAX_OBJECTS * MAX_FRAMES_IN_FLIGHT,
 				.poolSizeCount = static_cast<uint32_t>(poolSize.size()),
 				.pPoolSizes = poolSize.data()
 			};
@@ -1758,50 +1814,54 @@ namespace fluffy_fox::rendering
 
 		void createDescriptorSets()
 		{
-			std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, *descriptorSetLayout);
-
-			vk::DescriptorSetAllocateInfo allocInfo {
-				.descriptorPool = descriptorPool,
-				.descriptorSetCount = static_cast<uint32_t>(layouts.size()),
-				.pSetLayouts = layouts.data()
-			};
-
-			descriptorSets = device.allocateDescriptorSets(allocInfo);
-
-			for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+			for (auto& gameObject : gameObjects)
 			{
-				vk::DescriptorBufferInfo bufferInfo {
-					.buffer = uniformBuffers[i],
-					.offset = 0,
-					.range = sizeof(UniformBufferObject)
+				std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, *descriptorSetLayout);
+
+				vk::DescriptorSetAllocateInfo allocInfo {
+					.descriptorPool = descriptorPool,
+					.descriptorSetCount = static_cast<uint32_t>(layouts.size()),
+					.pSetLayouts = layouts.data()
 				};
 
-				vk::DescriptorImageInfo imageInfo {
-					.sampler = textureSampler,
-					.imageView = textureImageView,
-					.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-				};
+				gameObject.descriptorSets.clear();
+				gameObject.descriptorSets = device.allocateDescriptorSets(allocInfo);
 
-				std::array<vk::WriteDescriptorSet, 2> descriptorWrites {{
-					{
-						.dstSet = descriptorSets[i],
-						.dstBinding = 0,
-						.dstArrayElement = 0,
-						.descriptorCount = 1,
-						.descriptorType = vk::DescriptorType::eUniformBuffer,
-						.pBufferInfo = &bufferInfo
-					},
-					{
-						.dstSet = descriptorSets[i],
-						.dstBinding = 1,
-						.dstArrayElement = 0,
-						.descriptorCount = 1,
-						.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-						.pImageInfo = &imageInfo
-					}
-				}};
+				for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+				{
+					vk::DescriptorBufferInfo bufferInfo {
+						.buffer = gameObject.uniformBuffers[i],
+						.offset = 0,
+						.range = sizeof(UniformBufferObject)
+					};
 
-				device.updateDescriptorSets(descriptorWrites, {});
+					vk::DescriptorImageInfo imageInfo {
+						.sampler = textureSampler,
+						.imageView = textureImageView,
+						.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+					};
+
+					std::array<vk::WriteDescriptorSet, 2> descriptorWrites {{
+						{
+							.dstSet = gameObject.descriptorSets[i],
+							.dstBinding = 0,
+							.dstArrayElement = 0,
+							.descriptorCount = 1,
+							.descriptorType = vk::DescriptorType::eUniformBuffer,
+							.pBufferInfo = &bufferInfo
+						},
+						{
+							.dstSet = gameObject.descriptorSets[i],
+							.dstBinding = 1,
+							.dstArrayElement = 0,
+							.descriptorCount = 1,
+							.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+							.pImageInfo = &imageInfo
+						}
+					}};
+
+					device.updateDescriptorSets(descriptorWrites, {});
+				}
 			}
 		}
 
@@ -1922,10 +1982,18 @@ namespace fluffy_fox::rendering
 			commandBuffer.setViewport(0, viewport);
 			commandBuffer.setScissor(0, scissor);
 
-			commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, *descriptorSets[frameIndex], nullptr);
-			// commandBuffer.draw(3, 1, 0, 0);
-			// commandBuffer.draw(vertices.size(), 1, 0, 0);
-			commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+			for (const auto& gameObject : gameObjects)
+			{
+				commandBuffer.bindDescriptorSets(
+					vk::PipelineBindPoint::eGraphics,
+					pipelineLayout,
+					0,
+					*gameObject.descriptorSets[frameIndex],
+					nullptr
+				);
+
+				commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+			}
 
 			commandBuffer.endRendering();
 			// TODO needs synchronization here?
@@ -2034,7 +2102,7 @@ namespace fluffy_fox::rendering
 				throw std::runtime_error("failed to acquire swapchain image!");
 			}
 
-			updateUniformBuffer(frameIndex);
+			updateUniformBuffers(frameIndex);
 
 			device.resetFences(*inFlightFences[frameIndex]);
 
@@ -2077,21 +2145,32 @@ namespace fluffy_fox::rendering
 			frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
 		}
 
-		void updateUniformBuffer(uint32_t currentImage)
+		void updateUniformBuffers(int32_t frameIndex)
 		{
 			// using a UBO this way is not the most efficient way to pass frequently changing values to the shader.
 			// a more efficient way to pass a small buffer of data to shaders is "push constants".
 			static auto startTime = std::chrono::high_resolution_clock::now();
-
 			auto currentTime = std::chrono::high_resolution_clock::now();
 			float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
-			UniformBufferObject ubo{};
-			ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-			ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-			ubo.proj = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / static_cast<float>(swapChainExtent.height), 0.1f, 10.0f);
+			glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+			glm::mat4 proj = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / static_cast<float>(swapChainExtent.height), 0.1f, 10.0f);
 
-			memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+			for (auto& gameObject : gameObjects)
+			{
+				// gameObject.rotation.y += 0.001f;
+
+				glm::mat4 initialRotation = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+				glm::mat4 model = gameObject.getModelMatrix() * initialRotation;
+
+				UniformBufferObject ubo {
+					.model = model,
+					.view = view,
+					.proj = proj
+				};
+
+				memcpy(gameObject.uniformBuffersMapped[frameIndex], &ubo, sizeof(ubo));
+			}
 		}
 
 		vk::SampleCountFlagBits getMaxUsableSampleCount()
@@ -2165,6 +2244,7 @@ namespace fluffy_fox::rendering
 			createColorResources();
 			createDepthResources();
 			loadModel();
+			setupGameObjects();
 			createTextureImage();
 			createTextureImageView();
 			createTextureSampler();
@@ -2175,6 +2255,25 @@ namespace fluffy_fox::rendering
 			createDescriptorSets();
 			createCommandBuffers();
 			createSyncObjects();
+		}
+
+		~VulkanTutorial()
+		{
+			for (auto& gameObject : gameObjects)
+			{
+				for (size_t i = 0; i < gameObject.uniformBuffersMemory.size(); i++)
+				{
+					if (gameObject.uniformBuffersMapped[i] != nullptr)
+					{
+						gameObject.uniformBuffersMemory[i].unmapMemory();
+					}
+				}
+
+				gameObject.uniformBuffers.clear();
+				gameObject.uniformBuffersMemory.clear();
+				gameObject.uniformBuffersMapped.clear();
+				gameObject.descriptorSets.clear();
+			}
 		}
 
 		void run()
