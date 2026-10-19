@@ -12,8 +12,13 @@
 #include <chrono>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
+// #define TINYOBJLOADER_IMPLEMENTATION
+// #include <tiny_obj_loader.h>
+// #define TINYGLTF_IMPLEMENTATION
+// #define STB_IMAGE_WRITE_IMPLEMENTATION
+#define TINYGLTF3_ENABLE_FS
+#define TINYGLTF3_IMPLEMENTATION
+#include <tiny_gltf_v3.h>
 
 #include "rendering/window.hpp"
 
@@ -21,7 +26,7 @@ namespace fluffy_fox::rendering
 {
 	constexpr uint32_t WIDTH = 800;
 	constexpr uint32_t HEIGHT = 600;
-	const std::string MODEL_PATH = "models/viking_room.obj";
+	const std::string MODEL_PATH = "models/viking_room.gltf";
 	const std::string TEXTURE_PATH = "textures/viking_room.png";
 
 	constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
@@ -1146,46 +1151,352 @@ namespace fluffy_fox::rendering
 
 		void loadModel()
 		{
-			tinyobj::attrib_t attrib;
-			std::vector<tinyobj::shape_t> shapes;
-			std::vector<tinyobj::material_t> materials;
-			std::string warn, err;
+			tinygltf3::Model model;
+			tinygltf3::ErrorStack errors;
 
-			if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str()))
+			tg3_error_code err = tinygltf3::parse_file(model, errors, MODEL_PATH.c_str());
+
+			if (err != TG3_OK)
 			{
-				throw std::runtime_error(warn + err);
+				std::string error;
+				for (uint32_t i = 0; i < errors.count(); i++)
+				{
+					error += "[" + std::to_string((int)errors.entry(i)->severity) + "] ";
+					error += errors.entry(i)->message ? errors.entry(i)->message : "(null)";
+				}
+				throw std::runtime_error(error);
 			}
 
-			std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+			vertices.clear();
+			indices.clear();
 
-			for (const auto& shape : shapes)
+			for (uint32_t mesh_idx = 0; mesh_idx < model->meshes_count; mesh_idx++)
 			{
-				for (const auto& index : shape.mesh.indices)
+				const tg3_mesh& mesh = model->meshes[mesh_idx];
+				for (uint32_t primitive_idx = 0; primitive_idx < mesh.primitives_count; primitive_idx++)
 				{
-					Vertex vertex{};
-
-					vertex.pos = {
-						attrib.vertices[3 * index.vertex_index + 0],
-						attrib.vertices[3 * index.vertex_index + 1],
-						attrib.vertices[3 * index.vertex_index + 2],
-					};
-
-					vertex.texCoord = {
-						attrib.texcoords[2 * index.texcoord_index + 0],
-						1.0f - attrib.texcoords[2 * index.texcoord_index + 1],
-					};
-
-					vertex.color = {1.0f, 1.0f, 1.0f};
-
-					auto [it, inserted] = uniqueVertices.insert({ vertex, static_cast<uint32_t>(vertices.size()) });
-					if (inserted)
+					const tg3_primitive& primitive = mesh.primitives[primitive_idx];
+					if (primitive.mode == TG3_MODE_TRIANGLES || primitive.mode == -1)
 					{
-						vertices.push_back(vertex);
+						my_tg3_load_primitive(model.get(), primitive, vertices, indices);
 					}
+				}
+			}
+		}
 
+		static bool my_tg3_load_primitive(
+			const tg3_model* model,
+			const tg3_primitive& primitive,
+			std::vector<Vertex>& vertices,
+			std::vector<uint32_t>& indices
+		)
+		{
+			int32_t pos_accessor = my_tg3_find_attribute(primitive, "POSITION");
+			if (pos_accessor < 0) return false;
+
+			std::vector<float> pos;
+			std::vector<float> uv;
+
+			int32_t pos_num_components = 0;
+			int32_t uv_num_components = 0;
+			if (!my_tg3_read_accessor_floats(model, pos_accessor, pos, pos_num_components) || pos_num_components != 3) return false;
+
+			int uv_accessor = my_tg3_find_attribute(primitive, "TEXCOORD_0");
+			if (uv_accessor >= 0 && !my_tg3_read_accessor_floats(model, uv_accessor, uv, uv_num_components)) return false;
+			if (uv_accessor >= 0 && uv_num_components != 2) uv.clear();
+
+			const size_t vertex_count = pos.size() / 3;
+			const uint32_t base = (uint32_t)vertices.size();
+			std::unordered_map<Vertex, uint32_t> unique_vertices;
+			const bool has_indices = primitive.indices != TG3_INDEX_NONE;
+
+			for (size_t i = 0; i < vertex_count; i++)
+			{
+				Vertex vertex{};
+				memcpy(&vertex.pos, &pos[i * 3], 3 * sizeof(float));
+				if (i * 2 + 1 < uv.size())
+				{
+					memcpy(&vertex.texCoord, &uv[i * 2], 2 * sizeof(float));
+				}
+
+				vertex.texCoord[1] = 1.0f - vertex.texCoord[1]; // inverted
+
+				auto [it, inserted] = unique_vertices.insert({ vertex, static_cast<uint32_t>(vertices.size()) });
+				if (inserted)
+				{
+					vertices.push_back(vertex);
+				}
+
+				if (!has_indices)
+				{
 					indices.push_back(it->second);
 				}
 			}
+
+			if (has_indices)
+			{
+				std::vector<uint32_t> idx;
+				if (!my_tg3_read_indices(model, primitive.indices, idx)) return false;
+				for (uint32_t i : idx)
+				{
+					indices.push_back(base + i);
+				}
+			}
+
+			std::cout << std::to_string(indices.size()) << "\n";
+			std::cout << std::to_string(vertices.size()) << "\n";
+
+			return true;
+		}
+
+		static int32_t my_tg3_find_attribute(const tg3_primitive& primitive, const char* name)
+		{
+			for (uint32_t i = 0; i < primitive.attributes_count; i++)
+			{
+				if (tg3_str_equals_cstr(primitive.attributes[i].key, name))
+				{
+					return primitive.attributes[i].value;
+				}
+			}
+
+			return -1;
+		}
+
+		static bool my_tg3_read_accessor_floats(
+			const tg3_model* model,
+			int32_t accessor_idx,
+			std::vector<float>& out,
+			int& num_components
+		)
+		{
+			if (accessor_idx < 0 || (uint32_t)accessor_idx >= model->accessors_count) return false;
+			const tg3_accessor& accessor = model->accessors[accessor_idx];
+
+			num_components = tg3_num_components(accessor.type);
+			int32_t component_size = tg3_component_size(accessor.component_type);
+			if (num_components <= 0 || component_size <= 0) return false;
+
+			out.assign((size_t)accessor.count * component_size, 0.0f);
+			const bool is_accessor_normalized = accessor.normalized != 0;
+
+			if (accessor.buffer_view >= 0)
+			{
+				if ((uint32_t)accessor.buffer_view >= model->buffer_views_count) return false;
+				const tg3_buffer_view& buffer_view = model->buffer_views[accessor.buffer_view];
+				int32_t stride = tg3_accessor_byte_stride(&accessor, &buffer_view);
+				if (stride <= 0) return false;
+
+				const uint8_t* src = my_tg3_view_data(
+					model,
+					accessor.buffer_view,
+					accessor.byte_offset,
+					accessor.count,
+					stride,
+					(uint64_t)num_components * component_size
+				);
+				if (!src && accessor.count) return false;
+
+				for (uint64_t i = 0; i < accessor.count; i++)
+				{
+					for (int c = 0; c < num_components; c++)
+					{
+						out[i * num_components + c] = my_tg3_read_component(
+							src + i * stride + c * component_size,
+							accessor.component_type, is_accessor_normalized
+						);
+					}
+				}
+			}
+
+			if (accessor.sparse.is_sparse && accessor.sparse.count > 0)
+			{
+				const tg3_accessor_sparse& accessor_sparse = accessor.sparse;
+				int32_t sparse_component_size = tg3_component_size(accessor_sparse.indices.component_type);
+				if (sparse_component_size > 0)
+				{
+					const uint8_t* index_ptr = my_tg3_view_data(
+						model,
+						accessor_sparse.indices.buffer_view,
+						accessor_sparse.indices.byte_offset,
+						accessor_sparse.count,
+						sparse_component_size,
+						sparse_component_size
+					);
+
+					const uint8_t* vertex_ptr = my_tg3_view_data(
+						model,
+						accessor_sparse.values.buffer_view,
+						accessor_sparse.values.byte_offset,
+						accessor_sparse.count,
+						(uint64_t)num_components * component_size,
+						(uint64_t)num_components * component_size
+					);
+
+					if (index_ptr && vertex_ptr)
+					{
+						for (int32_t k = 0; k < accessor_sparse.count; k++)
+						{
+							uint32_t idx = my_tg3_read_index_value(
+								index_ptr + (size_t)k * sparse_component_size,
+								accessor_sparse.indices.component_type
+							);
+							if (idx >= accessor.count) continue;
+							for (int32_t c = 0; c < num_components; c++)
+							{
+								out[(size_t)idx * num_components + c] = my_tg3_read_component(
+									vertex_ptr + ((size_t)k * num_components + c) * component_size,
+									accessor.component_type,
+									is_accessor_normalized
+								);
+							}
+						}
+					}
+				}
+			}
+
+			return true;
+		}
+
+		static const uint8_t* my_tg3_view_data(
+			const tg3_model* model,
+			int32_t buffer_view_idx,
+			uint64_t extra_offset,
+			uint64_t count,
+			uint64_t stride,
+			uint64_t element_size
+		)
+		{
+			if (buffer_view_idx < 0 || (uint32_t)buffer_view_idx >= model->buffer_views_count) return nullptr;
+
+			const tg3_buffer_view& buffer_view = model->buffer_views[buffer_view_idx];
+			if (buffer_view.buffer < 0 || (uint32_t)buffer_view.buffer >= model->buffers_count) return nullptr;
+
+			const tg3_buffer& buffer = model->buffers[buffer_view.buffer];
+			if (!buffer.data.data) return nullptr;
+			if (count == 0) return buffer.data.data;
+
+			uint64_t start = buffer_view.byte_offset + extra_offset;
+			uint64_t end = start + (count - 1) * stride + element_size;
+			if (end > buffer.data.count) return nullptr;
+
+			return buffer.data.data + start;
+		}
+
+		static float my_tg3_read_component(const uint8_t* ptr, int32_t component_type, bool is_normalized)
+		{
+			switch (component_type)
+			{
+				case TG3_COMPONENT_TYPE_FLOAT:
+					{
+						float v;
+						memcpy(&v, ptr, 4);
+						return v;
+					}
+				case TG3_COMPONENT_TYPE_DOUBLE:
+					{
+						double v;
+						memcpy(&v, ptr, 8);
+						return (float)v;
+					}
+				case TG3_COMPONENT_TYPE_UNSIGNED_BYTE:
+					{
+						return is_normalized ? *ptr / 255.0f : (float)*ptr;
+					}
+				case TG3_COMPONENT_TYPE_BYTE:
+					{
+						int8_t v = (int8_t)*ptr;
+						return is_normalized ? std::max(v / 127.0f, -1.0f) : (float)v;
+					}
+				case TG3_COMPONENT_TYPE_UNSIGNED_SHORT:
+					{
+						uint16_t v;
+						memcpy(&v, ptr, 2);
+						return is_normalized ? v / 65535.0f : (float)v;
+					}
+				case TG3_COMPONENT_TYPE_SHORT:
+					{
+						int16_t v;
+						memcpy(&v, ptr, 2);
+						return is_normalized ? std::max(v / 32767.0f, -1.0f) : (float)v;
+					}
+				case TG3_COMPONENT_TYPE_UNSIGNED_INT:
+					{
+						uint32_t v;
+						memcpy(&v, ptr, 4);
+						return (float)v;
+					}
+				case TG3_COMPONENT_TYPE_INT:
+					{
+						int32_t v;
+						memcpy(&v, ptr, 4);
+						return (float)v;
+					}
+			}
+
+			return 0.0f;
+		}
+
+		static uint32_t my_tg3_read_index_value(const uint8_t* ptr, int32_t component_type)
+		{
+			switch (component_type)
+			{
+				case TG3_COMPONENT_TYPE_UNSIGNED_BYTE:
+					{
+						return *ptr;
+					}
+				case TG3_COMPONENT_TYPE_UNSIGNED_SHORT:
+					{
+						uint16_t v;
+						memcpy(&v, ptr, 2);
+						return v;
+					}
+				case TG3_COMPONENT_TYPE_UNSIGNED_INT:
+					{
+						uint32_t v;
+						memcpy(&v, ptr, 4);
+						return v;
+					}
+			}
+
+			return 0;
+		}
+
+		static bool my_tg3_read_indices(
+			const tg3_model* model,
+			int32_t accessor_idx,
+			std::vector<uint32_t>& out
+		)
+		{
+			if (accessor_idx < 0 || (uint32_t)accessor_idx >= model->accessors_count) return false;
+
+			const tg3_accessor& accessor = model->accessors[accessor_idx];
+			if (accessor.type != TG3_TYPE_SCALAR) return false;
+
+			int32_t component_size = tg3_component_size(accessor.component_type);
+			if (component_size <= 0 || accessor.buffer_view < 0 ||
+				(uint32_t)accessor.buffer_view >= model->buffer_views_count) return false;
+
+			const tg3_buffer_view& buffer_view = model->buffer_views[accessor.buffer_view];
+			int32_t stride = tg3_accessor_byte_stride(&accessor, &buffer_view);
+			if (stride <= 0) return false;
+
+			const uint8_t* src = my_tg3_view_data(
+				model,
+				accessor.buffer_view,
+				accessor.byte_offset,
+				accessor.count,
+				stride,
+				component_size
+			);
+			if (!src && accessor.count) return false;
+
+			out.resize((size_t)accessor.count);
+			for (uint64_t i = 0; i < accessor.count; i++)
+			{
+				out[i] = my_tg3_read_index_value(src + i * stride, accessor.component_type);
+			}
+
+			return true;
 		}
 
 		void createCommandBuffers()

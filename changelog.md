@@ -8,6 +8,7 @@
 ### Changed
 - dependencies (removed libevent, bgfx, hwinfo) (added fluff)
 - moved code to library fluff
+- from obj files to gltf
 
 ## [v0.0.7] 2026-10-17
 ### Added

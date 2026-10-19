@@ -55,7 +55,6 @@ target_compile_definitions(${LIB} INTERFACE
 # libraries
 add_subdirectory(${THIRD_PARTY_DIR}/glfw)
 add_subdirectory(${THIRD_PARTY_DIR}/spdlog)
-add_subdirectory(${THIRD_PARTY_DIR}/tinygltf)
 add_subdirectory(${THIRD_PARTY_DIR}/glm)
 add_subdirectory(${THIRD_PARTY_DIR}/fluff)
 
@@ -65,6 +64,9 @@ target_include_directories(stb INTERFACE ${THIRD_PARTY_DIR}/stb)
 add_library(tinyobjloader INTERFACE)
 target_include_directories(tinyobjloader INTERFACE ${THIRD_PARTY_DIR}/tinyobjloader)
 
+add_library(tinygltf INTERFACE)
+target_include_directories(tinygltf INTERFACE ${THIRD_PARTY_DIR}/tinygltf)
+
 target_link_libraries(${LIB} PUBLIC
 	pthread
 	Vulkan::Vulkan
@@ -72,6 +74,7 @@ target_link_libraries(${LIB} PUBLIC
 	spdlog
 	stb
 	tinyobjloader
+	tinygltf
 	fluff
 )
 
