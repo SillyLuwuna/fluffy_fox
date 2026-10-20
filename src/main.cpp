@@ -1,14 +1,16 @@
-#include "rendering/renderer.hpp"
-#include "spdlog/sinks/rotating_file_sink.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
-#include "spdlog/spdlog.h"
-#include <iostream>
-#include "rendering/window.hpp"
-#include "rendering/vulkan_tutorial.hpp"
+#include "engine/components/transform_component.hpp"
+#include "engine/entity.hpp"
+// #include "rendering/renderer.hpp"
+#include <spdlog/sinks/rotating_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
+// #include <iostream>
+// #include "rendering/window.hpp"
+// #include "rendering/vulkan_tutorial.hpp"
 
 
 using namespace fluffy_fox;
-using namespace fluffy_fox::rendering;
+// using namespace fluffy_fox::rendering;
 // using namespace fluffy_fox::networking;
 
 // TcpServer* srvr = nullptr;
@@ -166,19 +168,22 @@ int main()
 {
 	setup_logger();
 
-	Window window("owo", 840, 630);
-	// Renderer::instance().start(window, RendererType::Vulkan, false, 360);
+	// Window window("owo", 840, 630);
+	// // Renderer::instance().start(window, RendererType::Vulkan, false, 360);
+	//
+	// try
+	// {
+	// 	VulkanTutorial app(window);
+	// 	app.run();
+	// }
+	// catch (const std::exception& e)
+	// {
+	// 	std::cerr << e.what() << std::endl;
+	// 	return 1;
+	// }
 
-	try
-	{
-		VulkanTutorial app(window);
-		app.run();
-	}
-	catch (const std::exception& e)
-	{
-		std::cerr << e.what() << std::endl;
-		return 1;
-	}
+	Entity entity("owo");
+	TransformComponent t;
 
 	return 0;
 }
