@@ -22,6 +22,6 @@ namespace fluffy_fox
 	
 	protected:
 		virtual bool do_load() = 0;
-		virtual bool do_unload() = 0;
+		virtual void do_unload() = 0;
 	};
 }
