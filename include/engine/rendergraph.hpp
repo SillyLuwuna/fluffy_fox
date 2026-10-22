@@ -1,7 +1,9 @@
 #pragma once
 
+#include "engine/resource.hpp"
 #include <functional>
 #include <string>
+#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan_raii.hpp>
 #include <fluff/types.hpp>
 
@@ -69,5 +71,8 @@ namespace fluffy_fox
 		);
 
 		void compile();
+		void execute(vk::raii::CommandBuffer& command_buffer, vk::Queue queue);
+
+		Resource* get_resource(const std::string& name);
 	};
 }
