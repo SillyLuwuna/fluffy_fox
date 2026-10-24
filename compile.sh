@@ -15,5 +15,5 @@ else
 	type=$type
 fi
 
-cmake -B build -D CMAKE_BUILD_TYPE=$type # -DBUILD_TESTS=ON
+cmake -B build -D VALIDATION_LAYERS=ON -D CMAKE_BUILD_TYPE=$type # -DBUILD_TESTS=ON
 cmake --build build --parallel

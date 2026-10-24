@@ -17,6 +17,7 @@ set(SLANGC_EXECUTABLE "/home/luna/Documents/binaries/vulkan_lunarg_sdk/x86_64/bi
 
 # project settings and files
 option(BUILD_TESTS "Build tests" OFF)
+option(VALIDATION_LAYERS "Vulkan Validation Layers" OFF)
 
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_DIR})
 set(TEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${TEST_DIR})
@@ -46,11 +47,11 @@ set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
 
 set(EVENT__LIBRARY_TYPE "STATIC" CACHE STRING "" FORCE)
 
-target_compile_definitions(${LIB} INTERFACE
-	VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1
-	VULKAN_HPP_NO_STRUCT_CONSTRUCTORS=1
-	GLFW_INCLUDE_VULKAN=1
-)
+if (VALIDATION_LAYERS)
+	target_compile_definitions(${LIB} PRIVATE
+		VALIDATION_LAYERS=1
+	)
+endif()
 
 # libraries
 add_subdirectory(${THIRD_PARTY_DIR}/glfw)

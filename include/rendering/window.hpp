@@ -1,8 +1,12 @@
 #pragma once
 
 #include <fluff/events.hpp>
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <string>
+
+#include <fluff/types.hpp>
+using namespace fluff::types;
 
 namespace fluffy_fox::rendering
 {
@@ -11,16 +15,16 @@ namespace fluffy_fox::rendering
 	class Window
 	{
 	private:
-		uint16_t width_;
-		uint16_t height_;
+		i32 width_;
+		i32 height_;
 		GLFWwindow* window_;
 		Renderer* attached_renderer_;
-		fluff::Event<int32_t, int32_t> resize_event_;
+		fluff::Event<i32, i32> resize_event_;
 		fluff::Event<bool> focus_event_;
 		bool waiting_for_focus_;
 
 		void setup_events();
-		static void resize_callback(GLFWwindow* window, int32_t width, int32_t height);
+		static void resize_callback(GLFWwindow* window, i32 width, i32 height);
 		static void focus_callback(GLFWwindow* window, int focused);
 
 	public:
@@ -29,21 +33,23 @@ namespace fluffy_fox::rendering
 		Window& operator=(const Window&) = delete;
 		Window& operator=(Window&&) = delete;
 
-		Window(const std::string& name, int width, int height);
+		Window(const std::string& name, i32 width, i32 height);
 		~Window();
 
 		GLFWwindow* get_handle() const;
-		uint16_t width() const;
-		uint16_t height() const;
+		i32 width() const;
+		i32 height() const;
 
 		void start_event_loop();
 		void attach_renderer(Renderer& renderer);
 		void detach_renderer();
 
-		fluff::Event<int32_t, int32_t>& resize_event();
+		fluff::Event<i32, i32>& resize_event();
 		fluff::Event<bool>& focus_event();
 
 		void block_while_minimized();
 		void block_while_unfocused();
+
+		static std::vector<std::string> get_required_extensions();
 	};
 }

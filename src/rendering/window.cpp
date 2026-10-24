@@ -9,10 +9,9 @@
 #include "spdlog/spdlog.h"
 #include "rendering/renderer.hpp"
 
-
 using namespace fluffy_fox::rendering;
 
-Window::Window(const std::string& name, int width, int height) :
+Window::Window(const std::string& name, i32 width, i32 height) :
 	width_(width),
 	height_(height),
 	window_(nullptr),
@@ -52,13 +51,13 @@ void Window::setup_events()
 	glfwSetWindowFocusCallback(window_, focus_callback);
 }
 
-void Window::resize_callback(GLFWwindow* window, int32_t width, int32_t height)
+void Window::resize_callback(GLFWwindow* window, i32 width, i32 height)
 {
 	Window* obj = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
 	obj->resize_event_.invoke(width, height);
 }
 
-void Window::focus_callback(GLFWwindow* window, int focused)
+void Window::focus_callback(GLFWwindow* window, i32 focused)
 {
 	Window* obj = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
 
@@ -103,70 +102,17 @@ void Window::start_event_loop()
 	spdlog::info("closing window");
 }
 
-// void* Window::get_platform_window() const
-// {
-// 	switch (glfwGetPlatform())
-// 	{
-// #if defined(IS_WAYLAND)
-// 		case GLFW_PLATFORM_WAYLAND:
-// 			return glfwGetWaylandWindow(window_);
-// 			break;
-// #elif defined(IS_X11)
-// 		case GLFW_PLATFORM_X11:
-// 			return glfwGetX11Window(window_);
-// 			break;
-// #elif defined(IS_APPLE)
-// 		case GLFW_PLATFORM_COCOA:
-// 			return glfwGetCocoaWindow(window_);
-// 			break;
-// #elif defined(IS_WINDOWS)
-// 		case GLFW_PLATFORM_WIN32:
-// 			return glfwGetWin32Window(window_);
-// 			break;
-// #endif
-// 	}
-//
-// 	return nullptr;
-// }
-
-// void* Window::get_platform_display() const
-// {
-// 	switch (glfwGetPlatform())
-// 	{
-// #if defined(IS_WAYLAND)
-// 		case GLFW_PLATFORM_WAYLAND:
-// 			return glfwGetWaylandDisplay();
-// 			break;
-// #elif defined(IS_X11)
-// 		case GLFW_PLATFORM_X11:
-// 			return glfwGetX11Display();
-// 			break;
-// #endif
-// 	}
-//
-// 	return nullptr;
-// }
-
-// bool Window::is_wayland() const
-// {
-// #if defined(IS_WAYLAND)
-// 	return true;
-// #else
-// 	return false;
-// #endif
-// }
-
 GLFWwindow* Window::get_handle() const
 {
 	return window_;
 }
 
-uint16_t Window::width() const
+i32 Window::width() const
 {
 	return width_;
 }
 
-uint16_t Window::height() const
+i32 Window::height() const
 {
 	return height_;
 }
@@ -193,8 +139,8 @@ fluff::Event<bool>& Window::focus_event()
 
 void Window::block_while_minimized()
 {
-	int width = 0;
-	int height = 0;
+	i32 width = 0;
+	i32 height = 0;
 	glfwGetFramebufferSize(window_, &width, &height);
 
 	while (width == 0 || height == 0)
@@ -213,4 +159,19 @@ void Window::block_while_unfocused()
 		glfwWaitEvents();
 	}
 	// if (!waiting_for_focus)
+}
+
+std::vector<std::string> Window::get_required_extensions()
+{
+	u32 glfw_extension_count = 0;
+	const char** glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
+
+	std::vector<std::string> required_extensions;
+
+	for (u32 i = 0; i < glfw_extension_count; i++)
+	{
+		required_extensions.emplace_back(glfw_extensions[i]);
+	}
+
+	return required_extensions;
 }

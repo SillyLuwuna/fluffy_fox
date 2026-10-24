@@ -1,6 +1,8 @@
 #pragma once
 
 #include <iostream>
+// #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
+#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan_raii.hpp>
 #include <fstream>
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -10,8 +12,6 @@
 #include <glm/gtx/hash.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
-// #define TINYOBJLOADER_IMPLEMENTATION
-// #include <tiny_obj_loader.h>
 #define TINYGLTF3_ENABLE_STB_IMAGE
 #define TINYGLTF3_ENABLE_STB_IMAGE_WRITE
 #define TINYGLTF3_ENABLE_FS
@@ -21,6 +21,7 @@
 #include <stb_image.h>
 
 #include "rendering/window.hpp"
+#include "rendering/device.hpp"
 
 // TODO push constants
 // TODO instancing
@@ -164,7 +165,8 @@ namespace fluffy_fox::rendering
 		vk::raii::Instance instance = nullptr;
 		vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
 		vk::raii::SurfaceKHR surface = nullptr;
-		vk::raii::PhysicalDevice physicalDevice = nullptr;
+		std::unique_ptr<Device> my_device;
+		// vk::raii::PhysicalDevice physicalDevice = nullptr;
 		vk::raii::Device device = nullptr;
 		uint32_t queueIndex;
 		vk::raii::Queue graphicsQueue = nullptr;
@@ -257,6 +259,7 @@ namespace fluffy_fox::rendering
 
 		void createSurface()
 		{
+			// TODO move to window class
 			VkSurfaceKHR _surface;
 			if (glfwCreateWindowSurface(*instance, window.get_handle(), nullptr, &_surface) != 0)
 			{
@@ -338,83 +341,15 @@ namespace fluffy_fox::rendering
 			instance = vk::raii::Instance(context, createInfo); // TODO check for errors
 		}
 
-		void pickPhysicalDevice()
-		{
-			auto physicalDevices = instance.enumeratePhysicalDevices();
-
-			if (physicalDevices.empty())
-			{
-				throw std::runtime_error("failed to find GPUs with Vulkan support!");
-			}
-
-			bool found = false;
-			vk::raii::PhysicalDevice chosen = nullptr;
-
-			// std::cout << "available GPUs:\n";
-			for (auto physicalDevice : physicalDevices)
-			{
-				// auto deviceFeatures = physicalDevice.getFeatures();
-
-				auto deviceProperties = physicalDevice.getProperties();
-				bool supportsVulkan1_3 = deviceProperties.apiVersion >= vk::ApiVersion13;
-				// std::cout << "\t" << deviceProperties.deviceName.data() << "\n";
-
-				auto queueFamilies = physicalDevice.getQueueFamilyProperties();
-				bool supportsGraphics = std::ranges::any_of(queueFamilies, [](auto const &qfp) { return (bool)(qfp.queueFlags & vk::QueueFlagBits::eGraphics); });
-
-				auto availableDeviceExtensions = physicalDevice.enumerateDeviceExtensionProperties();
-				std::vector<const char*> requiredDeviceExtension = { vk::KHRSwapchainExtensionName };
-				bool supportsAllRequiredExtensions =
-					std::ranges::all_of(requiredDeviceExtension,
-						[&availableDeviceExtensions](auto const& requiredDeviceExtension) {
-							return std::ranges::any_of(availableDeviceExtensions,
-								[requiredDeviceExtension](auto const& availableDeviceExtension) {
-									return strcmp(availableDeviceExtension.extensionName, requiredDeviceExtension) == 0;
-								}
-							);
-						}
-					);
-
-				auto features = physicalDevice.template getFeatures2<
-					vk::PhysicalDeviceFeatures2,
-					vk::PhysicalDeviceVulkan11Features,
-					vk::PhysicalDeviceVulkan13Features,
-					vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
-				bool supportsRequiredFeatures =
-					features.template get<vk::PhysicalDeviceFeatures2>().features.samplerAnisotropy && 
-					features.template get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters &&
-					features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering &&
-					features.template get<vk::PhysicalDeviceVulkan13Features>().synchronization2 &&
-					features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState;
-
-				if (
-					supportsVulkan1_3 &&
-					supportsGraphics &&
-					supportsAllRequiredExtensions &&
-					supportsRequiredFeatures &&
-					deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu
-				)
-				{
-					if (found) continue;
-					found = true;
-					chosen = physicalDevice;
-				}
-			}
-
-			physicalDevice = chosen;
-			msaaSamples = getMaxUsableSampleCount(); // TODO change location
-			
-		}
-
 		void createLogicalDevice()
 		{
-			std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
+			std::vector<vk::QueueFamilyProperties> queueFamilyProperties = my_device->physical().getQueueFamilyProperties();
 
 			queueIndex = ~0;
 			for (uint32_t qfpIndex = 0; qfpIndex < queueFamilyProperties.size(); qfpIndex++)
 			{
 				if ((queueFamilyProperties[qfpIndex].queueFlags & vk::QueueFlagBits::eGraphics) &&
-					physicalDevice.getSurfaceSupportKHR(qfpIndex, *surface))
+					my_device->physical().getSurfaceSupportKHR(qfpIndex, *surface))
 				{
 					queueIndex = qfpIndex;
 					break;
@@ -461,20 +396,20 @@ namespace fluffy_fox::rendering
 				.ppEnabledExtensionNames = requiredDeviceExtension.data()
 			};
 
-			device = vk::raii::Device(physicalDevice, deviceCreateInfo); // TODO error checking
+			device = vk::raii::Device(my_device->physical(), deviceCreateInfo); // TODO error checking
 			graphicsQueue = vk::raii::Queue(device, queueIndex, 0);
 		}
 
 		void createSwapChain()
 		{
-			vk::SurfaceCapabilitiesKHR surfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR(*surface);
+			vk::SurfaceCapabilitiesKHR surfaceCapabilities = my_device->physical().getSurfaceCapabilitiesKHR(*surface);
 			swapChainExtent = chooseSwapExtent(surfaceCapabilities);
 			uint32_t minImageCount = chooseSwapMinImageCount(surfaceCapabilities);
 
-			std::vector<vk::SurfaceFormatKHR> availableFormats = physicalDevice.getSurfaceFormatsKHR(*surface);
+			std::vector<vk::SurfaceFormatKHR> availableFormats = my_device->physical().getSurfaceFormatsKHR(*surface);
 			swapChainSurfaceFormat = chooseSwapSurfaceFormat(availableFormats);
 
-			std::vector<vk::PresentModeKHR> availablePresentModes = physicalDevice.getSurfacePresentModesKHR(*surface);
+			std::vector<vk::PresentModeKHR> availablePresentModes = my_device->physical().getSurfacePresentModesKHR(*surface);
 			vk::PresentModeKHR presentMode = chooseSwapPresentMode(availablePresentModes);
 
 			vk::SwapchainCreateInfoKHR swapChainCreateInfo {
@@ -839,7 +774,7 @@ namespace fluffy_fox::rendering
 		{
 			for (const auto format : candidates)
 			{
-				vk::FormatProperties props = physicalDevice.getFormatProperties(format);
+				vk::FormatProperties props = my_device->physical().getFormatProperties(format);
 
 				if (((tiling == vk::ImageTiling::eLinear) && ((props.linearTilingFeatures & features) == features)) ||
 					((tiling == vk::ImageTiling::eOptimal) && ((props.optimalTilingFeatures & features) == features)))
@@ -919,7 +854,7 @@ namespace fluffy_fox::rendering
 		{
 			// PERF usually done once and stored. Not generated each time.
 
-			vk::FormatProperties formatProperties = physicalDevice.getFormatProperties(imageFormat);
+			vk::FormatProperties formatProperties = my_device->physical().getFormatProperties(imageFormat);
 			if (!(formatProperties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear))
 			{
 				throw std::runtime_error("texture image format does not support linear blitting!");
@@ -1183,7 +1118,7 @@ namespace fluffy_fox::rendering
 
 		void createTextureSampler()
 		{
-			vk::PhysicalDeviceProperties properties = physicalDevice.getProperties();
+			vk::PhysicalDeviceProperties properties = my_device->physical().getProperties();
 
 			vk::SamplerCreateInfo samplerInfo {
 				.magFilter = vk::Filter::eLinear, // when close to camera, magnify
@@ -1868,7 +1803,7 @@ namespace fluffy_fox::rendering
 		uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
 		{
 			// selecting a specific heap "memoryHeaps" may increase performance
-			vk::PhysicalDeviceMemoryProperties memProperties = physicalDevice.getMemoryProperties();
+			vk::PhysicalDeviceMemoryProperties memProperties = my_device->physical().getMemoryProperties();
 
 			for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
 			{
@@ -2176,7 +2111,7 @@ namespace fluffy_fox::rendering
 		vk::SampleCountFlagBits getMaxUsableSampleCount()
 		{
 			// PERF might not be the best idea to choose the highest possible
-			vk::PhysicalDeviceProperties physicalDeviceProperties = physicalDevice.getProperties();
+			vk::PhysicalDeviceProperties physicalDeviceProperties = my_device->physical().getProperties();
 
 			vk::SampleCountFlags counts =
 				physicalDeviceProperties.limits.framebufferColorSampleCounts &
@@ -2234,7 +2169,8 @@ namespace fluffy_fox::rendering
 			createInstance();
 			setupDebugMessenger();
 			createSurface();
-			pickPhysicalDevice();
+			my_device = std::make_unique<Device>(instance);
+			msaaSamples = getMaxUsableSampleCount(); // TODO change location
 			createLogicalDevice();
 			createSwapChain();
 			createImageViews();
