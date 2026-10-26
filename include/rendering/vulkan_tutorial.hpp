@@ -28,6 +28,8 @@
 // TODO batch draw calls
 // TODO indirect drawing
 
+// TODO imports for vulkan and other libraries
+
 namespace fluffy_fox::rendering
 {
 	constexpr uint32_t WIDTH = 800;
@@ -164,12 +166,8 @@ namespace fluffy_fox::rendering
 		vk::raii::Context context;
 		vk::raii::Instance instance = nullptr;
 		vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
+		std::unique_ptr<Device> device;
 		vk::raii::SurfaceKHR surface = nullptr;
-		std::unique_ptr<Device> my_device;
-		// vk::raii::PhysicalDevice physicalDevice = nullptr;
-		vk::raii::Device device = nullptr;
-		uint32_t queueIndex;
-		vk::raii::Queue graphicsQueue = nullptr;
 		vk::raii::SwapchainKHR swapChain = nullptr;
 		std::vector<vk::Image> swapChainImages;
 		vk::SurfaceFormatKHR swapChainSurfaceFormat;
@@ -257,18 +255,6 @@ namespace fluffy_fox::rendering
 			debugMessenger = instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT);
 		}
 
-		void createSurface()
-		{
-			// TODO move to window class
-			VkSurfaceKHR _surface;
-			if (glfwCreateWindowSurface(*instance, window.get_handle(), nullptr, &_surface) != 0)
-			{
-				throw std::runtime_error("failed to create window surface!");
-			}
-
-			surface = vk::raii::SurfaceKHR(instance, _surface);
-		}
-
 		std::vector<const char *> getRequiredInstanceExtensions()
 		{
 			uint32_t glfwExtensionCount = 0;
@@ -341,79 +327,20 @@ namespace fluffy_fox::rendering
 			instance = vk::raii::Instance(context, createInfo); // TODO check for errors
 		}
 
-		void createLogicalDevice()
-		{
-			std::vector<vk::QueueFamilyProperties> queueFamilyProperties = my_device->physical().getQueueFamilyProperties();
-
-			queueIndex = ~0;
-			for (uint32_t qfpIndex = 0; qfpIndex < queueFamilyProperties.size(); qfpIndex++)
-			{
-				if ((queueFamilyProperties[qfpIndex].queueFlags & vk::QueueFlagBits::eGraphics) &&
-					my_device->physical().getSurfaceSupportKHR(qfpIndex, *surface))
-				{
-					queueIndex = qfpIndex;
-					break;
-				}
-			}
-
-			if (queueIndex == ~0u)
-			{
-				throw std::runtime_error("Could not find a queue for graphics and present");
-			}
-
-			float queuePriority = 0.5f;
-
-			vk::StructureChain<
-				vk::PhysicalDeviceFeatures2,
-				vk::PhysicalDeviceVulkan11Features,
-				vk::PhysicalDeviceVulkan13Features,
-				vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
-			> featureChain = {
-				{.features = {
-					 .sampleRateShading = true, // PERF slow, but better quality multisampling
-					 .samplerAnisotropy = true,
-				}}, // Features2
-				{.shaderDrawParameters = true}, // Vulkan11Features
-				{.synchronization2 = true, .dynamicRendering = true }, // Vulkan13Features
-				{.extendedDynamicState = true} // ExtendedDynamicStateFeaturesEXT
-			};
-
-			std::vector<const char*> requiredDeviceExtension = {
-				vk::KHRSwapchainExtensionName
-			};
-
-			vk::DeviceQueueCreateInfo deviceQueueCreateInfo {
-				.queueFamilyIndex = queueIndex,
-				.queueCount = 1,
-				.pQueuePriorities = &queuePriority
-			};
-
-			vk::DeviceCreateInfo deviceCreateInfo {
-				.pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(),
-				.queueCreateInfoCount = 1,
-				.pQueueCreateInfos = &deviceQueueCreateInfo,
-				.enabledExtensionCount = static_cast<uint32_t>(requiredDeviceExtension.size()),
-				.ppEnabledExtensionNames = requiredDeviceExtension.data()
-			};
-
-			device = vk::raii::Device(my_device->physical(), deviceCreateInfo); // TODO error checking
-			graphicsQueue = vk::raii::Queue(device, queueIndex, 0);
-		}
-
 		void createSwapChain()
 		{
-			vk::SurfaceCapabilitiesKHR surfaceCapabilities = my_device->physical().getSurfaceCapabilitiesKHR(*surface);
+			vk::SurfaceCapabilitiesKHR surfaceCapabilities = device->physical().getSurfaceCapabilitiesKHR(*window.surface());
 			swapChainExtent = chooseSwapExtent(surfaceCapabilities);
 			uint32_t minImageCount = chooseSwapMinImageCount(surfaceCapabilities);
 
-			std::vector<vk::SurfaceFormatKHR> availableFormats = my_device->physical().getSurfaceFormatsKHR(*surface);
+			std::vector<vk::SurfaceFormatKHR> availableFormats = device->physical().getSurfaceFormatsKHR(*window.surface());
 			swapChainSurfaceFormat = chooseSwapSurfaceFormat(availableFormats);
 
-			std::vector<vk::PresentModeKHR> availablePresentModes = my_device->physical().getSurfacePresentModesKHR(*surface);
+			std::vector<vk::PresentModeKHR> availablePresentModes = device->physical().getSurfacePresentModesKHR(*window.surface());
 			vk::PresentModeKHR presentMode = chooseSwapPresentMode(availablePresentModes);
 
 			vk::SwapchainCreateInfoKHR swapChainCreateInfo {
-				.surface = *surface,
+				.surface = *window.surface(),
 				.minImageCount = minImageCount,
 				.imageFormat = swapChainSurfaceFormat.format,
 				.imageColorSpace = swapChainSurfaceFormat.colorSpace,
@@ -427,7 +354,7 @@ namespace fluffy_fox::rendering
 				.clipped = true,
 			};
 
-			swapChain = vk::raii::SwapchainKHR(device, swapChainCreateInfo);
+			swapChain = vk::raii::SwapchainKHR(device->logical(), swapChainCreateInfo);
 			swapChainImages = swapChain.getImages();
 		}
 
@@ -526,7 +453,7 @@ namespace fluffy_fox::rendering
 				.pBindings = bindings.data()
 			};
 
-			descriptorSetLayout = vk::raii::DescriptorSetLayout(device, layoutInfo);
+			descriptorSetLayout = vk::raii::DescriptorSetLayout(device->logical(), layoutInfo);
 		}
 
 		void createGraphicsPipeline()
@@ -648,7 +575,7 @@ namespace fluffy_fox::rendering
 				.pushConstantRangeCount = 0
 			};
 
-			pipelineLayout = vk::raii::PipelineLayout(device, pipelineLayoutInfo);
+			pipelineLayout = vk::raii::PipelineLayout(device->logical(), pipelineLayoutInfo);
 
 			vk::Format depthFormat = findDepthFormat();
 
@@ -678,7 +605,7 @@ namespace fluffy_fox::rendering
 				vk::PipelineRenderingCreateInfo
 			> pipelineCreateInfoChain = { graphicsPipelineCreateInfo , pipelineRenderingCreateInfo };
 
-			graphicsPipeline = vk::raii::Pipeline(device, nullptr, pipelineCreateInfoChain.get<vk::GraphicsPipelineCreateInfo>());
+			graphicsPipeline = vk::raii::Pipeline(device->logical(), nullptr, pipelineCreateInfoChain.get<vk::GraphicsPipelineCreateInfo>());
 		}
 
 		[[nodiscard]]
@@ -688,7 +615,7 @@ namespace fluffy_fox::rendering
 				.codeSize = code.size() * sizeof(char),
 				.pCode = reinterpret_cast<const uint32_t*>(code.data())
 			};
-			vk::raii::ShaderModule shaderModule(device, createInfo);
+			vk::raii::ShaderModule shaderModule(device->logical(), createInfo);
 			return shaderModule;
 		}
 
@@ -711,11 +638,12 @@ namespace fluffy_fox::rendering
 
 		void createCommandPool()
 		{
+			std::cout << std::to_string(device->graphics_family()) << "\n";
 			vk::CommandPoolCreateInfo poolInfo {
 				.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-				.queueFamilyIndex = queueIndex
+				.queueFamilyIndex = device->graphics_family()
 			};
-			commandPool = vk::raii::CommandPool(device, poolInfo);
+			commandPool = vk::raii::CommandPool(device->logical(), poolInfo);
 		}
 
 		void createColorResources()
@@ -774,7 +702,7 @@ namespace fluffy_fox::rendering
 		{
 			for (const auto format : candidates)
 			{
-				vk::FormatProperties props = my_device->physical().getFormatProperties(format);
+				vk::FormatProperties props = device->physical().getFormatProperties(format);
 
 				if (((tiling == vk::ImageTiling::eLinear) && ((props.linearTilingFeatures & features) == features)) ||
 					((tiling == vk::ImageTiling::eOptimal) && ((props.optimalTilingFeatures & features) == features)))
@@ -854,7 +782,7 @@ namespace fluffy_fox::rendering
 		{
 			// PERF usually done once and stored. Not generated each time.
 
-			vk::FormatProperties formatProperties = my_device->physical().getFormatProperties(imageFormat);
+			vk::FormatProperties formatProperties = device->physical().getFormatProperties(imageFormat);
 			if (!(formatProperties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear))
 			{
 				throw std::runtime_error("texture image format does not support linear blitting!");
@@ -973,14 +901,14 @@ namespace fluffy_fox::rendering
 				.sharingMode = vk::SharingMode::eExclusive
 			};
 
-			vk::raii::Image image = vk::raii::Image(device, imageInfo);
+			vk::raii::Image image = vk::raii::Image(device->logical(), imageInfo);
 
 			vk::MemoryRequirements memRequirements = image.getMemoryRequirements();
 			vk::MemoryAllocateInfo allocInfo = {
 				.allocationSize = memRequirements.size,
 				.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties)
 			};
-			vk::raii::DeviceMemory imageMemory = vk::raii::DeviceMemory(device, allocInfo);
+			vk::raii::DeviceMemory imageMemory = vk::raii::DeviceMemory(device->logical(), allocInfo);
 			image.bindMemory(imageMemory, 0);
 
 			return { std::move(image), std::move(imageMemory) };
@@ -993,7 +921,7 @@ namespace fluffy_fox::rendering
 				.level = vk::CommandBufferLevel::ePrimary,
 				.commandBufferCount = 1
 			};
-			vk::raii::CommandBuffer commandBuffer = std::move(vk::raii::CommandBuffers(device, allocInfo).front());
+			vk::raii::CommandBuffer commandBuffer = std::move(vk::raii::CommandBuffers(device->logical(), allocInfo).front());
 
 			vk::CommandBufferBeginInfo beginInfo { .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit };
 			commandBuffer.begin(beginInfo);
@@ -1010,8 +938,8 @@ namespace fluffy_fox::rendering
 				.pCommandBuffers = &*commandBuffer
 			};
 
-			graphicsQueue.submit(submitInfo, nullptr);
-			graphicsQueue.waitIdle();
+			device->graphics().submit(submitInfo, nullptr);
+			device->graphics().waitIdle();
 		}
 
 		void transitionImageLayout(
@@ -1113,12 +1041,12 @@ namespace fluffy_fox::rendering
 				}
 			};
 
-			return vk::raii::ImageView(device, viewInfo);
+			return vk::raii::ImageView(device->logical(), viewInfo);
 		}
 
 		void createTextureSampler()
 		{
-			vk::PhysicalDeviceProperties properties = my_device->physical().getProperties();
+			vk::PhysicalDeviceProperties properties = device->physical().getProperties();
 
 			vk::SamplerCreateInfo samplerInfo {
 				.magFilter = vk::Filter::eLinear, // when close to camera, magnify
@@ -1138,7 +1066,7 @@ namespace fluffy_fox::rendering
 				.unnormalizedCoordinates = false,
 			};
 
-			textureSampler = vk::raii::Sampler(device, samplerInfo);
+			textureSampler = vk::raii::Sampler(device->logical(), samplerInfo);
 		}
 
 		void loadModel()
@@ -1612,7 +1540,7 @@ namespace fluffy_fox::rendering
 				.level = vk::CommandBufferLevel::ePrimary,
 				.commandBufferCount = MAX_FRAMES_IN_FLIGHT
 			};
-			commandBuffers = vk::raii::CommandBuffers(device, allocInfo);
+			commandBuffers = vk::raii::CommandBuffers(device->logical(), allocInfo);
 			// commandBuffer = std::move(vk::raii::CommandBuffers(device, allocInfo).front());
 		}
 
@@ -1661,7 +1589,7 @@ namespace fluffy_fox::rendering
 				.sharingMode = vk::SharingMode::eExclusive
 			};
 
-			vk::raii::Buffer buffer = vk::raii::Buffer(device, bufferInfo);
+			vk::raii::Buffer buffer = vk::raii::Buffer(device->logical(), bufferInfo);
 			vk::MemoryRequirements memRequirements = buffer.getMemoryRequirements();
 
 			vk::MemoryAllocateInfo allocInfo = {
@@ -1669,7 +1597,7 @@ namespace fluffy_fox::rendering
 				.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties)
 			};
 
-			vk::raii::DeviceMemory bufferMemory = vk::raii::DeviceMemory(device, allocInfo);
+			vk::raii::DeviceMemory bufferMemory = vk::raii::DeviceMemory(device->logical(), allocInfo);
 			buffer.bindMemory(*bufferMemory, 0); // second parameter is the offset within the region of memory
 			return {
 				std::move(buffer),
@@ -1744,7 +1672,7 @@ namespace fluffy_fox::rendering
 				.pPoolSizes = poolSize.data()
 			};
 
-			descriptorPool = vk::raii::DescriptorPool(device, poolInfo);
+			descriptorPool = vk::raii::DescriptorPool(device->logical(), poolInfo);
 		}
 
 		void createDescriptorSets()
@@ -1760,7 +1688,7 @@ namespace fluffy_fox::rendering
 				};
 
 				gameObject.descriptorSets.clear();
-				gameObject.descriptorSets = device.allocateDescriptorSets(allocInfo);
+				gameObject.descriptorSets = device->logical().allocateDescriptorSets(allocInfo);
 
 				for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 				{
@@ -1795,7 +1723,7 @@ namespace fluffy_fox::rendering
 						}
 					}};
 
-					device.updateDescriptorSets(descriptorWrites, {});
+					device->logical().updateDescriptorSets(descriptorWrites, {});
 				}
 			}
 		}
@@ -1803,7 +1731,7 @@ namespace fluffy_fox::rendering
 		uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
 		{
 			// selecting a specific heap "memoryHeaps" may increase performance
-			vk::PhysicalDeviceMemoryProperties memProperties = my_device->physical().getMemoryProperties();
+			vk::PhysicalDeviceMemoryProperties memProperties = device->physical().getMemoryProperties();
 
 			for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
 			{
@@ -1994,13 +1922,13 @@ namespace fluffy_fox::rendering
 
 			for (size_t i = 0; i < swapChainImages.size(); i++)
 			{
-				renderFinishedSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
+				renderFinishedSemaphores.emplace_back(device->logical(), vk::SemaphoreCreateInfo());
 			}
 
 			for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 			{
-				presentCompleteSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
-				inFlightFences.emplace_back(device, vk::FenceCreateInfo{.flags = vk::FenceCreateFlagBits::eSignaled});
+				presentCompleteSemaphores.emplace_back(device->logical(), vk::SemaphoreCreateInfo());
+				inFlightFences.emplace_back(device->logical(), vk::FenceCreateInfo{.flags = vk::FenceCreateFlagBits::eSignaled});
 			}
 		}
 
@@ -2012,12 +1940,12 @@ namespace fluffy_fox::rendering
 				drawFrame();
 			}
 
-			device.waitIdle();
+			device->logical().waitIdle();
 		}
 
 		void drawFrame()
 		{
-			auto fenceResult = device.waitForFences(*inFlightFences[frameIndex], true, std::numeric_limits<uint64_t>::max());
+			auto fenceResult = device->logical().waitForFences(*inFlightFences[frameIndex], true, std::numeric_limits<uint64_t>::max());
 			if (fenceResult != vk::Result::eSuccess)
 			{
 				throw std::runtime_error("failted to wait for fence!");
@@ -2039,7 +1967,7 @@ namespace fluffy_fox::rendering
 
 			updateUniformBuffers(frameIndex);
 
-			device.resetFences(*inFlightFences[frameIndex]);
+			device->logical().resetFences(*inFlightFences[frameIndex]);
 
 			commandBuffers[frameIndex].reset();
 			recordCommandBuffer(frameIndex, imageIndex);
@@ -2055,7 +1983,7 @@ namespace fluffy_fox::rendering
 				.pSignalSemaphores = &*renderFinishedSemaphores[imageIndex]
 			};
 
-			graphicsQueue.submit(submitInfo, *inFlightFences[frameIndex]); // TODO error handling
+			device->graphics().submit(submitInfo, *inFlightFences[frameIndex]); // TODO error handling
 
 			const vk::PresentInfoKHR presentInfoKHR {
 				.waitSemaphoreCount = 1,
@@ -2066,7 +1994,7 @@ namespace fluffy_fox::rendering
 				.pResults = nullptr
 			};
 
-			result = graphicsQueue.presentKHR(presentInfoKHR);
+			result = device->graphics().presentKHR(presentInfoKHR);
 			if ((result == vk::Result::eSuboptimalKHR) || (result == vk::Result::eErrorOutOfDateKHR) || framebufferResized)
 			{
 				framebufferResized = false;
@@ -2111,7 +2039,7 @@ namespace fluffy_fox::rendering
 		vk::SampleCountFlagBits getMaxUsableSampleCount()
 		{
 			// PERF might not be the best idea to choose the highest possible
-			vk::PhysicalDeviceProperties physicalDeviceProperties = my_device->physical().getProperties();
+			vk::PhysicalDeviceProperties physicalDeviceProperties = device->physical().getProperties();
 
 			vk::SampleCountFlags counts =
 				physicalDeviceProperties.limits.framebufferColorSampleCounts &
@@ -2139,7 +2067,7 @@ namespace fluffy_fox::rendering
 
 			// slow, instead of waiting, just pass the old swapchain as oldSwapchain in the new swapchain
 			// and destroy the old swapchain as soon as we're finished using it
-			device.waitIdle();
+			device->logical().waitIdle();
 
 			cleanupSwapChain();
 
@@ -2168,10 +2096,10 @@ namespace fluffy_fox::rendering
 			setWindowSettings();
 			createInstance();
 			setupDebugMessenger();
-			createSurface();
-			my_device = std::make_unique<Device>(instance);
+			if (!window.create_surface(instance)) { throw std::runtime_error("failed to create window surface!"); }
+			device = std::make_unique<Device>(instance, *window.surface());
+			if (!device->is_valid()) { throw std::runtime_error("failed to create window surface!"); }
 			msaaSamples = getMaxUsableSampleCount(); // TODO change location
-			createLogicalDevice();
 			createSwapChain();
 			createImageViews();
 			createDescriptorSetLayout();
@@ -2210,6 +2138,10 @@ namespace fluffy_fox::rendering
 				gameObject.uniformBuffersMapped.clear();
 				gameObject.descriptorSets.clear();
 			}
+
+			surface = std::move(window.surface()); // FIXME
+
+			// window.destroy_surface();
 		}
 
 		void run()

@@ -1,8 +1,6 @@
 #include <iostream>
 #include <stdexcept>
 
-#include <GLFW/glfw3.h>
-#include <GLFW/glfw3native.h>
 #include <fluff/events.hpp>
 
 #include "rendering/window.hpp"
@@ -16,7 +14,8 @@ Window::Window(const std::string& name, i32 width, i32 height) :
 	height_(height),
 	window_(nullptr),
 	attached_renderer_(nullptr),
-	waiting_for_focus_(false)
+	waiting_for_focus_(false),
+	surface_(nullptr)
 {
 	// if (Renderer::instance().is_running())
 	// {
@@ -102,21 +101,6 @@ void Window::start_event_loop()
 	spdlog::info("closing window");
 }
 
-GLFWwindow* Window::get_handle() const
-{
-	return window_;
-}
-
-i32 Window::width() const
-{
-	return width_;
-}
-
-i32 Window::height() const
-{
-	return height_;
-}
-
 void Window::attach_renderer(Renderer& renderer)
 {
 	attached_renderer_ = &renderer;
@@ -125,16 +109,6 @@ void Window::attach_renderer(Renderer& renderer)
 void Window::detach_renderer()
 {
 	attached_renderer_ = nullptr;
-}
-
-fluff::Event<int32_t, int32_t>& Window::resize_event()
-{
-	return resize_event_;
-}
-
-fluff::Event<bool>& Window::focus_event()
-{
-	return focus_event_;
 }
 
 void Window::block_while_minimized()
@@ -174,4 +148,23 @@ std::vector<std::string> Window::get_required_extensions()
 	}
 
 	return required_extensions;
+}
+
+// returns nullptr when surface
+bool Window::create_surface(vk::raii::Instance& vulkan_instance)
+{
+	VkSurfaceKHR surface;
+	bool success = glfwCreateWindowSurface(*vulkan_instance, window_, nullptr, &surface) == 0;
+
+	if (success)
+	{
+		surface_ = vk::raii::SurfaceKHR(vulkan_instance, surface);
+	}
+
+	return success;
+}
+
+void Window::destroy_surface()
+{
+	surface_ = nullptr;
 }

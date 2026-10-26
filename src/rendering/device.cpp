@@ -1,11 +1,10 @@
 #include "rendering/device.hpp"
-#include "rendering/window.hpp"
 
 using namespace fluffy_fox::rendering;
 
-Device::Device(vk::raii::Instance& instance) :
+Device::Device(vk::raii::Instance& instance, vk::SurfaceKHR surface) :
 	physical_device_(choose_physical_device(instance)),
-	device_(create_logical_device(physical_device_))
+	device_(create_logical_device(physical_device_, surface))
 	// TODO error handling, what if both of these end up being nullptr? how should other
 	// classes know and deal with it?
 { }
@@ -133,48 +132,254 @@ i32 Device::device_score(vk::raii::PhysicalDevice& device)
 }
 
 // returns nullptr if error
-vk::raii::Device Device::create_logical_device(vk::raii::PhysicalDevice& physical_device)
+vk::raii::Device Device::create_logical_device(vk::raii::PhysicalDevice& physical_device, vk::SurfaceKHR surface)
 {
 	if (physical_device == nullptr) return nullptr;
 
-	i32 queue_index = find_graphics_queue_index(physical_device);
-	if (queue_index < 0) return nullptr;
+	FeatureChain feature_chain = get_desired_feature_chain();
+	std::vector<const char*> required_device_extensions = get_logical_device_required_extensions();
+	std::vector<vk::DeviceQueueCreateInfo> queue_create_infos = get_queue_create_infos(surface);
 
-	// needs physical_device
-	// needs surface
+	vk::DeviceCreateInfo device_create_info {
+		.pNext = feature_chain.get(),
+		.queueCreateInfoCount = static_cast<u32>(queue_create_infos.size()),
+		.pQueueCreateInfos = queue_create_infos.data(),
+		.enabledExtensionCount = static_cast<u32>(required_device_extensions.size()),
+		.ppEnabledExtensionNames = required_device_extensions.data()
+	};
 
-	// generates queue_index
-	// generates queue
+	vk::raii::Device device = vk::raii::Device(physical_device, device_create_info);
+
+	init_queue(graphics_, device);
+	// init_queue(present_, device);
+	// init_queue(transfer_, device);
+	// init_queue(compute_, device);
+
+	return std::move(device);
+}
+
+// assumes queue_info is populated
+void Device::init_queue(Device::QueueInfo& queue_info, vk::raii::Device& device)
+{
+	queue_info.queue = vk::raii::Queue(device, queue_info.family, queue_info.index);
 }
 
 // returns -1 if not found
-i32 Device::find_graphics_queue_index(vk::raii::PhysicalDevice& physical_device)
+i32 Device::find_graphics_queue_index(vk::raii::PhysicalDevice& physical_device, vk::SurfaceKHR surface)
 {
 	std::vector<vk::QueueFamilyProperties> queue_family_properties = physical_device.getQueueFamilyProperties();
 
-	i32 queue_index = -1;
+	i32 queue = -1;
+
 	for (i32 i = 0; i < queue_family_properties.size(); i++)
 	{
 		vk::QueueFamilyProperties& queue_properties = queue_family_properties[i];
-		if ((queue_properties.queueFlags & vk::QueueFlagBits::eGraphics) &&
-			physical_device.getSurfaceSupportKHR(i, *surface))
+		bool is_graphics_queue = static_cast<bool>(queue_properties.queueFlags & vk::QueueFlagBits::eGraphics);
+		bool is_present_queue = physical_device.getSurfaceSupportKHR(i, surface);
+
+		if (is_graphics_queue && is_present_queue)
 		{
-			queue_index = i;
-			break;
+			return i;
+		}
+
+		if (is_graphics_queue)
+		{
+			queue = i;
 		}
 	}
 
-	return queue_index;
+	return queue;
 }
 
-vk::raii::PhysicalDevice& Device::physical() // TODO remove
+// returns -1 if not found
+i32 Device::find_transfer_queue_index(vk::raii::PhysicalDevice& physical_device)
 {
-	return physical_device_;
+	std::vector<vk::QueueFamilyProperties> queue_family_properties = physical_device.getQueueFamilyProperties();
+
+	for (i32 i = 0; i < queue_family_properties.size(); i++)
+	{
+		vk::QueueFamilyProperties& queue_properties = queue_family_properties[i];
+		if (queue_properties.queueFlags & vk::QueueFlagBits::eTransfer)
+		{
+			return i;
+		}
+	}
+
+	return -1;
 }
 
-vk::raii::Device& Device::logical() // TODO remove
+i32 Device::find_present_queue_index(vk::raii::PhysicalDevice& physical_device, vk::SurfaceKHR surface)
 {
-	return device_;
+	std::vector<vk::QueueFamilyProperties> queue_family_properties = physical_device.getQueueFamilyProperties();
+
+	i32 queue = -1;
+
+	for (i32 i = 0; i < queue_family_properties.size(); i++)
+	{
+		vk::QueueFamilyProperties& queue_properties = queue_family_properties[i];
+		bool is_graphics_queue = static_cast<bool>(queue_properties.queueFlags & vk::QueueFlagBits::eGraphics);
+		bool is_present_queue = physical_device.getSurfaceSupportKHR(i, surface);
+
+		if (is_graphics_queue && is_present_queue)
+		{
+			return i;
+		}
+
+		if (is_present_queue)
+		{
+			queue = i;
+		}
+	}
+
+	return queue;
+}
+
+i32 Device::find_compute_queue_index(vk::raii::PhysicalDevice& physical_device)
+{
+	std::vector<vk::QueueFamilyProperties> queue_family_properties = physical_device.getQueueFamilyProperties();
+
+	for (i32 i = 0; i < queue_family_properties.size(); i++)
+	{
+		vk::QueueFamilyProperties& queue_properties = queue_family_properties[i];
+		if (queue_properties.queueFlags & vk::QueueFlagBits::eCompute)
+		{
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+Device::FeatureChain Device::get_desired_feature_chain()
+{
+	FeatureChain feature_chain {
+		.feature_chain {
+			{ // Features2
+				.features = {
+					.sampleRateShading = true,
+					.samplerAnisotropy = true
+				}
+			},
+			{ // Vulkan11Features
+				.shaderDrawParameters = true
+			},
+			{ // Vulkan13Features
+				.synchronization2 = true,
+				.dynamicRendering = true
+			},
+			{ // ExtendedDynamicStateFeaturesEXT
+				.extendedDynamicState = true
+			}
+		}
+	};
+
+	return feature_chain;
+}
+
+std::vector<const char*> Device::get_logical_device_required_extensions()
+{
+	return {
+		vk::KHRSwapchainExtensionName
+	};
+}
+
+// populates queues_
+std::vector<vk::DeviceQueueCreateInfo> Device::get_queue_create_infos(vk::SurfaceKHR surface)
+{
+	std::vector<vk::DeviceQueueCreateInfo> device_create_infos;
+
+	// FIXME check if the queues are actually the same family.
+	// if they are, don't create so many queues.
+	create_graphics_queues(device_create_infos, surface);
+	create_present_queues(device_create_infos, surface);
+	create_transfer_queues(device_create_infos);
+	create_compute_queues(device_create_infos);
+
+	return device_create_infos;
+}
+
+void Device::create_graphics_queues(std::vector<vk::DeviceQueueCreateInfo>& out, vk::SurfaceKHR surface)
+{
+	i32 family = find_graphics_queue_index(physical_device_, surface);
+	if (family < 0) return;
+
+	graphics_ = {
+		.family = static_cast<u32>(family),
+		.index = 0,
+		.priority = 0.5f,
+		.queue = nullptr
+	};
+
+	vk::DeviceQueueCreateInfo queue_create_info {
+		.queueFamilyIndex = graphics_.family,
+		.queueCount = 1,
+		.pQueuePriorities = &graphics_.priority
+	};
+
+	out.emplace_back(queue_create_info);
+}
+
+void Device::create_present_queues(std::vector<vk::DeviceQueueCreateInfo>& out, vk::SurfaceKHR surface)
+{
+	i32 family = find_present_queue_index(physical_device_, surface);
+	if (family < 0) return;
+
+	present_ = {
+		.family = static_cast<u32>(family),
+		.index = 0,
+		.priority = 0.5f,
+		.queue = nullptr
+	};
+
+	vk::DeviceQueueCreateInfo queue_create_info {
+		.queueFamilyIndex = present_.family,
+		.queueCount = 1,
+		.pQueuePriorities = &present_.priority
+	};
+
+	// out.emplace_back(queue_create_info);
+}
+
+void Device::create_transfer_queues(std::vector<vk::DeviceQueueCreateInfo>& out)
+{
+	i32 family = find_transfer_queue_index(physical_device_);
+	if (family < 0) return;
+
+	transfer_ = {
+		.family = static_cast<u32>(family),
+		.index = 0,
+		.priority = 0.5f,
+		.queue = nullptr
+	};
+
+	vk::DeviceQueueCreateInfo queue_create_info {
+		.queueFamilyIndex = transfer_.family,
+		.queueCount = 1,
+		.pQueuePriorities = &transfer_.priority
+	};
+
+	// out.emplace_back(queue_create_info);
+}
+
+void Device::create_compute_queues(std::vector<vk::DeviceQueueCreateInfo>& out)
+{
+	i32 family = find_compute_queue_index(physical_device_);
+	if (family < 0) return;
+
+	compute_ = {
+		.family = static_cast<u32>(family),
+		.index = 0,
+		.priority = 0.5f,
+		.queue = nullptr
+	};
+
+	vk::DeviceQueueCreateInfo queue_create_info {
+		.queueFamilyIndex = compute_.family,
+		.queueCount = 1,
+		.pQueuePriorities = &compute_.priority
+	};
+
+	// out.emplace_back(queue_create_info);
 }
 
 bool Device::is_valid()

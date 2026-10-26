@@ -12,6 +12,34 @@ namespace fluffy_fox::rendering
 	class Device
 	{
 	private:
+		struct FeatureChain
+		{
+			vk::StructureChain<
+				vk::PhysicalDeviceFeatures2,
+				vk::PhysicalDeviceVulkan11Features,
+				vk::PhysicalDeviceVulkan13Features,
+				vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
+			> feature_chain;
+
+			inline void* get()
+			{
+				return &feature_chain.get<vk::PhysicalDeviceFeatures2>();
+			}
+		};
+
+		struct QueueInfo
+		{
+			u32 family;
+			u32 index;
+			f32 priority;
+			std::optional<vk::raii::Queue> queue;
+		};
+
+		QueueInfo graphics_;
+		QueueInfo present_;
+		QueueInfo transfer_;
+		QueueInfo compute_;
+
 		vk::raii::PhysicalDevice physical_device_;
 		vk::raii::Device device_;
 
@@ -24,14 +52,35 @@ namespace fluffy_fox::rendering
 		static std::vector<std::string> get_physical_device_required_extensions();
 		static i32 device_score(vk::raii::PhysicalDevice& device);
 
-		static vk::raii::Device create_logical_device(vk::raii::PhysicalDevice& physical_device);
-		static i32 find_graphics_queue_index(vk::raii::PhysicalDevice& physical_device);
+		vk::raii::Device create_logical_device(vk::raii::PhysicalDevice& physical_device, vk::SurfaceKHR surface);
+		static i32 find_graphics_queue_index(vk::raii::PhysicalDevice& physical_device, vk::SurfaceKHR surface);
+		static i32 find_present_queue_index(vk::raii::PhysicalDevice& physical_device, vk::SurfaceKHR surface);
+		static i32 find_transfer_queue_index(vk::raii::PhysicalDevice& physical_device);
+		static i32 find_compute_queue_index(vk::raii::PhysicalDevice& physical_device);
+		static FeatureChain get_desired_feature_chain();
+		static std::vector<const char*> get_logical_device_required_extensions();
+		std::vector<vk::DeviceQueueCreateInfo> get_queue_create_infos(vk::SurfaceKHR surface);
+		void create_graphics_queues(std::vector<vk::DeviceQueueCreateInfo>& out, vk::SurfaceKHR surface);
+		void create_present_queues(std::vector<vk::DeviceQueueCreateInfo>& out, vk::SurfaceKHR surface);
+		void create_transfer_queues(std::vector<vk::DeviceQueueCreateInfo>& out);
+		void create_compute_queues(std::vector<vk::DeviceQueueCreateInfo>& out);
+		static void init_queue(QueueInfo& queue, vk::raii::Device& device);
 
 	public:
-		Device(vk::raii::Instance& instance);
+		Device(vk::raii::Instance& instance, vk::SurfaceKHR surface);
 
-		vk::raii::PhysicalDevice& physical();
-		vk::raii::Device& logical();
+		inline vk::raii::PhysicalDevice& physical() { return physical_device_; } // TODO remove
+		inline vk::raii::Device& logical() { return device_; } // TODO remove
 		bool is_valid();
+
+		inline vk::raii::Queue& graphics() { return graphics_.queue.value(); }
+		inline vk::raii::Queue& present() { return present_.queue.value(); }
+		inline vk::raii::Queue& transfer() { return transfer_.queue.value(); }
+		inline vk::raii::Queue& compute() { return compute_.queue.value(); }
+
+		inline u32 graphics_family() const { return graphics_.family; }
+		inline u32 present_family() const { return present_.family; }
+		inline u32 transfer_family() const { return transfer_.family; }
+		inline u32 compute_family() const { return compute_.family; }
 	};
 }
