@@ -56,7 +56,11 @@ namespace fluffy_fox::rendering
 		static std::vector<std::string> get_required_extensions();
 
 		bool create_surface(vk::raii::Instance& vulkan_instance);
-		inline vk::raii::SurfaceKHR& surface() { return surface_; };
-		void destroy_surface();
+		inline const vk::raii::SurfaceKHR& surface() const { return surface_; }
+		inline vk::raii::SurfaceKHR take_surface() { return std::move(surface_); } // FIXME
+		void destroy_surface(); // FIXME
+
+		// width and height
+		std::pair<i32, i32> framebuffer_size() const;
 	};
 }

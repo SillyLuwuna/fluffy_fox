@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rendering/swapchain.hpp"
 #include <iostream>
 // #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
@@ -167,12 +168,8 @@ namespace fluffy_fox::rendering
 		vk::raii::Instance instance = nullptr;
 		vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
 		std::unique_ptr<Device> device;
-		vk::raii::SurfaceKHR surface = nullptr;
-		vk::raii::SwapchainKHR swapChain = nullptr;
-		std::vector<vk::Image> swapChainImages;
-		vk::SurfaceFormatKHR swapChainSurfaceFormat;
-		vk::Extent2D swapChainExtent;
-		std::vector<vk::raii::ImageView> swapChainImageViews;
+		vk::raii::SurfaceKHR surface = nullptr; // FIXME
+		std::unique_ptr<Swapchain> swapchain;
 		vk::raii::DescriptorSetLayout descriptorSetLayout = nullptr;
 		vk::raii::PipelineLayout pipelineLayout = nullptr;
 		vk::raii::Pipeline graphicsPipeline = nullptr;
@@ -327,110 +324,6 @@ namespace fluffy_fox::rendering
 			instance = vk::raii::Instance(context, createInfo); // TODO check for errors
 		}
 
-		void createSwapChain()
-		{
-			vk::SurfaceCapabilitiesKHR surfaceCapabilities = device->physical().getSurfaceCapabilitiesKHR(*window.surface());
-			swapChainExtent = chooseSwapExtent(surfaceCapabilities);
-			uint32_t minImageCount = chooseSwapMinImageCount(surfaceCapabilities);
-
-			std::vector<vk::SurfaceFormatKHR> availableFormats = device->physical().getSurfaceFormatsKHR(*window.surface());
-			swapChainSurfaceFormat = chooseSwapSurfaceFormat(availableFormats);
-
-			std::vector<vk::PresentModeKHR> availablePresentModes = device->physical().getSurfacePresentModesKHR(*window.surface());
-			vk::PresentModeKHR presentMode = chooseSwapPresentMode(availablePresentModes);
-
-			vk::SwapchainCreateInfoKHR swapChainCreateInfo {
-				.surface = *window.surface(),
-				.minImageCount = minImageCount,
-				.imageFormat = swapChainSurfaceFormat.format,
-				.imageColorSpace = swapChainSurfaceFormat.colorSpace,
-				.imageExtent = swapChainExtent,
-				.imageArrayLayers = 1,
-				.imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
-				.imageSharingMode = vk::SharingMode::eExclusive,
-				.preTransform = surfaceCapabilities.currentTransform,
-				.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
-				.presentMode = presentMode,
-				.clipped = true,
-			};
-
-			swapChain = vk::raii::SwapchainKHR(device->logical(), swapChainCreateInfo);
-			swapChainImages = swapChain.getImages();
-		}
-
-		uint32_t chooseSwapMinImageCount(vk::SurfaceCapabilitiesKHR const& surfaceCapabilities)
-		{
-			auto minImageCount = std::max(3u, surfaceCapabilities.minImageCount);
-			if ((0 < surfaceCapabilities.maxImageCount) && (surfaceCapabilities.maxImageCount < minImageCount))
-			{
-				minImageCount = surfaceCapabilities.maxImageCount;
-			}
-			return minImageCount;
-		}
-
-		vk::SurfaceFormatKHR chooseSwapSurfaceFormat(std::vector<vk::SurfaceFormatKHR> const& availableFormats)
-		{
-			const auto formatIt = std::ranges::find_if(availableFormats,
-				[](const auto& format) {
-					return format.format == vk::Format::eB8G8R8A8Srgb &&
-						format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear;
-				}
-			);
-
-			return formatIt != availableFormats.end() ? *formatIt : availableFormats[0];
-		}
-
-		vk::PresentModeKHR chooseSwapPresentMode(std::vector<vk::PresentModeKHR> const& availablePresentModes)
-		{
-			assert(std::ranges::any_of(availablePresentModes, [](auto presentMode) { return presentMode == vk::PresentModeKHR::eFifo; })); // should have eFifo at all times at the least
-
-			vk::PresentModeKHR best_present_mode = vk::PresentModeKHR::eFifo;
-			for (const vk::PresentModeKHR& present_mode : availablePresentModes)
-			{
-				if (present_mode == vk::PresentModeKHR::eImmediate)
-				{
-					best_present_mode = present_mode;
-					break;
-				}
-
-				if (best_present_mode != vk::PresentModeKHR::eImmediate && present_mode == vk::PresentModeKHR::eMailbox)
-				{
-					best_present_mode = present_mode;
-					continue;
-				}
-			}
-
-			return best_present_mode;
-		}
-
-		vk::Extent2D chooseSwapExtent(vk::SurfaceCapabilitiesKHR const& capabilities)
-		{
-			if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) // if not allowed to specify resolution
-			{
-				return capabilities.currentExtent;
-			}
-			int width;
-			int height;
-			glfwGetFramebufferSize(window.get_handle(), &width, &height);
-
-			return {
-				std::clamp<uint32_t>(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
-				std::clamp<uint32_t>(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)
-			};
-		}
-
-		void createImageViews()
-		{
-			assert(swapChainImageViews.empty());
-
-			swapChainImageViews.reserve(swapChainImages.size());
-
-			for (auto& image : swapChainImages)
-			{
-				swapChainImageViews.emplace_back(createImageView(image, swapChainSurfaceFormat.format, vk::ImageAspectFlagBits::eColor, 1));
-			}
-		}
-
 		void createDescriptorSetLayout()
 		{
 			std::array<vk::DescriptorSetLayoutBinding, 2> bindings {{
@@ -581,7 +474,7 @@ namespace fluffy_fox::rendering
 
 			vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo {
 				.colorAttachmentCount = 1,
-				.pColorAttachmentFormats = &swapChainSurfaceFormat.format,
+				.pColorAttachmentFormats = &swapchain->surface_format().format,
 				.depthAttachmentFormat = depthFormat
 			};
 
@@ -648,11 +541,11 @@ namespace fluffy_fox::rendering
 
 		void createColorResources()
 		{
-			vk::Format colorFormat = swapChainSurfaceFormat.format;
+			vk::Format colorFormat = swapchain->surface_format().format;
 
 			std::tie(colorImage, colorImageMemory) = createImage(
-				swapChainExtent.width,
-				swapChainExtent.height,
+				swapchain->extent().width,
+				swapchain->extent().height,
 				1,
 				msaaSamples,
 				colorFormat,
@@ -673,8 +566,8 @@ namespace fluffy_fox::rendering
 		{
 			vk::Format depthFormat = findDepthFormat();
 			std::tie(depthImage, depthImageMemory) = createImage(
-				swapChainExtent.width,
-				swapChainExtent.height,
+				swapchain->extent().width,
+				swapchain->extent().height,
 				1,
 				msaaSamples,
 				depthFormat,
@@ -1752,7 +1645,7 @@ namespace fluffy_fox::rendering
 
 			transition_image_layout(
 				commandBuffer,
-				swapChainImages[imageIndex],
+				swapchain->images()[imageIndex],
 				vk::ImageLayout::eUndefined,
 				vk::ImageLayout::eColorAttachmentOptimal,
 				{},
@@ -1793,7 +1686,7 @@ namespace fluffy_fox::rendering
 				.imageView = colorImageView,
 				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
 				.resolveMode = vk::ResolveModeFlagBits::eAverage,
-				.resolveImageView = swapChainImageViews[imageIndex],
+				.resolveImageView = swapchain->image_views()[imageIndex],
 				.resolveImageLayout = vk::ImageLayout::eColorAttachmentOptimal,
 				.loadOp = vk::AttachmentLoadOp::eClear,
 				.storeOp = vk::AttachmentStoreOp::eStore,
@@ -1811,7 +1704,7 @@ namespace fluffy_fox::rendering
 			vk::RenderingInfo renderingInfo = {
 				.renderArea = {
 					.offset = {0, 0},
-					.extent = swapChainExtent
+					.extent = swapchain->extent()
 				},
 				.layerCount = 1,
 				.colorAttachmentCount = 1,
@@ -1829,17 +1722,17 @@ namespace fluffy_fox::rendering
 			vk::Viewport viewport {
 				.x = 0.0f,
 				// .y = 0.0f,
-				.y = static_cast<float>(swapChainExtent.height), // because of glm, to flip Y coordinate
-				.width = static_cast<float>(swapChainExtent.width),
-				.height = -static_cast<float>(swapChainExtent.height), // minus sign because of glm, which assumes Y coordinate is flipped
-				// .height = static_cast<float>(swapChainExtent.height),
+				.y = static_cast<float>(swapchain->extent().height), // because of glm, to flip Y coordinate
+				.width = static_cast<float>(swapchain->extent().width),
+				.height = -static_cast<float>(swapchain->extent().height), // minus sign because of glm, which assumes Y coordinate is flipped
+				// .height = static_cast<float>(swapchain->extent().height),
 				.minDepth = 0.0f,
 				.maxDepth = 1.0f
 			};
 
 			vk::Rect2D scissor {
 				.offset = vk::Offset2D { 0, 0 },
-				.extent = swapChainExtent
+				.extent = swapchain->extent()
 			};
 
 			commandBuffer.setViewport(0, viewport);
@@ -1863,7 +1756,7 @@ namespace fluffy_fox::rendering
 
 			transition_image_layout(
 				commandBuffer,
-				swapChainImages[imageIndex],
+				swapchain->images()[imageIndex],
 				vk::ImageLayout::eColorAttachmentOptimal,
 				vk::ImageLayout::ePresentSrcKHR,
 				vk::AccessFlagBits2::eColorAttachmentWrite,
@@ -1920,7 +1813,7 @@ namespace fluffy_fox::rendering
 		{
 			assert(presentCompleteSemaphores.empty() && renderFinishedSemaphores.empty() && inFlightFences.empty());
 
-			for (size_t i = 0; i < swapChainImages.size(); i++)
+			for (size_t i = 0; i < swapchain->images().size(); i++)
 			{
 				renderFinishedSemaphores.emplace_back(device->logical(), vk::SemaphoreCreateInfo());
 			}
@@ -1951,7 +1844,7 @@ namespace fluffy_fox::rendering
 				throw std::runtime_error("failted to wait for fence!");
 			}
 
-			auto [result, imageIndex] = swapChain.acquireNextImage(std::numeric_limits<uint64_t>::max(), *presentCompleteSemaphores[frameIndex], nullptr);
+			auto [result, imageIndex] = swapchain->swapchain().acquireNextImage(std::numeric_limits<uint64_t>::max(), *presentCompleteSemaphores[frameIndex], nullptr);
 
 			if (result == vk::Result::eErrorOutOfDateKHR)
 			{
@@ -1989,7 +1882,7 @@ namespace fluffy_fox::rendering
 				.waitSemaphoreCount = 1,
 				.pWaitSemaphores = &*renderFinishedSemaphores[imageIndex],
 				.swapchainCount = 1,
-				.pSwapchains = &*swapChain,
+				.pSwapchains = &*swapchain->swapchain(),
 				.pImageIndices = &imageIndex,
 				.pResults = nullptr
 			};
@@ -2017,7 +1910,7 @@ namespace fluffy_fox::rendering
 			float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
 			glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-			glm::mat4 proj = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / static_cast<float>(swapChainExtent.height), 0.1f, 10.0f);
+			glm::mat4 proj = glm::perspective(glm::radians(45.0f), static_cast<float>(swapchain->extent().width) / static_cast<float>(swapchain->extent().height), 0.1f, 10.0f);
 
 			for (auto& gameObject : gameObjects)
 			{
@@ -2055,12 +1948,6 @@ namespace fluffy_fox::rendering
 			return vk::SampleCountFlagBits::e1;
 		}
 
-		void cleanupSwapChain()
-		{
-			swapChainImageViews.clear();
-			swapChain = nullptr;
-		}
-
 		void recreateSwapChain()
 		{
 			window.block_while_minimized();
@@ -2069,10 +1956,7 @@ namespace fluffy_fox::rendering
 			// and destroy the old swapchain as soon as we're finished using it
 			device->logical().waitIdle();
 
-			cleanupSwapChain();
-
-			createSwapChain();
-			createImageViews();
+			swapchain->recreate(*device, window);
 			createColorResources();
 			createDepthResources();
 		}
@@ -2096,12 +1980,15 @@ namespace fluffy_fox::rendering
 			setWindowSettings();
 			createInstance();
 			setupDebugMessenger();
+
 			if (!window.create_surface(instance)) { throw std::runtime_error("failed to create window surface!"); }
 			device = std::make_unique<Device>(instance, *window.surface());
 			if (!device->is_valid()) { throw std::runtime_error("failed to create window surface!"); }
-			msaaSamples = getMaxUsableSampleCount(); // TODO change location
-			createSwapChain();
-			createImageViews();
+
+			msaaSamples = getMaxUsableSampleCount(); // TODO change location to a "multisampling_system"
+
+			swapchain = std::make_unique<Swapchain>(*device, window);
+
 			createDescriptorSetLayout();
 			createGraphicsPipeline();
 			createCommandPool();
@@ -2139,7 +2026,7 @@ namespace fluffy_fox::rendering
 				gameObject.descriptorSets.clear();
 			}
 
-			surface = std::move(window.surface()); // FIXME
+			surface = window.take_surface(); // FIXME
 
 			// window.destroy_surface();
 		}

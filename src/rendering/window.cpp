@@ -168,3 +168,10 @@ void Window::destroy_surface()
 {
 	surface_ = nullptr;
 }
+
+std::pair<i32, i32> Window::framebuffer_size() const
+{
+	i32 width, height;
+	glfwGetFramebufferSize(window_, &width, &height);
+	return { width, height };
+}
