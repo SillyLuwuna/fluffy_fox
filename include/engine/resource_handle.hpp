@@ -23,6 +23,8 @@ namespace fluffy_fox
 			resource_manager_(manager)
 		{ }
 
+		~ResourceHandle();
+
 		T* get() const;
 		bool is_valid() const;
 
@@ -63,5 +65,12 @@ namespace fluffy_fox
 	bool ResourceHandle<T>::is_valid() const
 	{
 		return resource_manager_ && resource_manager_->has_resource<T>(resource_id_);
+	}
+
+	template<typename T>
+	ResourceHandle<T>::~ResourceHandle()
+	{
+		if (!resource_manager_) return;
+		resource_manager_->release<T>(resource_id_);
 	}
 }

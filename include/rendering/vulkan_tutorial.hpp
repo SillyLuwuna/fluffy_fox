@@ -5,7 +5,6 @@
 // #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan_raii.hpp>
-#include <fstream>
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #define GLM_ENABLE_EXPERIMENTAL
@@ -23,6 +22,8 @@
 
 #include "rendering/window.hpp"
 #include "rendering/device.hpp"
+#include "rendering/pipeline.hpp"
+#include "rendering/vertex.hpp"
 
 // TODO push constants
 // TODO instancing
@@ -56,51 +57,6 @@ namespace fluffy_fox::rendering
 #else
 		constexpr bool enableValidationLayers = false;
 #endif
-
-	struct Vertex
-	{
-		glm::vec3 pos;
-		glm::vec3 color;
-		glm::vec2 texCoord;
-
-		bool operator==(const Vertex& other) const
-		{
-			return pos == other.pos && color == other.color && texCoord == other.texCoord;
-		}
-
-		static vk::VertexInputBindingDescription getBindingDescription()
-		{
-			return {
-				.binding = 0,
-				.stride = sizeof(Vertex),
-				.inputRate = vk::VertexInputRate::eVertex
-			};
-		}
-
-		static std::array<vk::VertexInputAttributeDescription, 3> getAttributeDescriptions()
-		{
-			return {{
-				{
-					.location = 0,
-					.binding = 0,
-					.format = vk::Format::eR32G32B32Sfloat,
-					.offset = offsetof(Vertex, pos)
-				},
-				{
-					.location = 1,
-					.binding = 0,
-					.format = vk::Format::eR32G32B32Sfloat,
-					.offset = offsetof(Vertex, color)
-				},
-				{
-					.location = 2,
-					.binding = 0,
-					.format = vk::Format::eR32G32Sfloat,
-					.offset = offsetof(Vertex, texCoord)
-				}
-			}};
-		}
-	};
 
 	struct UniformBufferObject
 	{
@@ -147,17 +103,6 @@ namespace fluffy_fox::rendering
 	};
 }
 
-namespace std
-{
-	template<> struct hash<fluffy_fox::rendering::Vertex>
-	{
-		size_t operator()(fluffy_fox::rendering::Vertex const& vertex) const
-		{
-			return ((hash<glm::vec3>()(vertex.pos) ^ (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^ (hash<glm::vec2>()(vertex.texCoord) << 1);
-		}
-	};
-}
-
 namespace fluffy_fox::rendering
 {
 	class VulkanTutorial
@@ -167,12 +112,13 @@ namespace fluffy_fox::rendering
 		vk::raii::Context context;
 		vk::raii::Instance instance = nullptr;
 		vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
+
+		std::unique_ptr<ResourceManager> resource_manager;
 		std::unique_ptr<Device> device;
 		vk::raii::SurfaceKHR surface = nullptr; // FIXME
 		std::unique_ptr<Swapchain> swapchain;
-		vk::raii::DescriptorSetLayout descriptorSetLayout = nullptr;
-		vk::raii::PipelineLayout pipelineLayout = nullptr;
-		vk::raii::Pipeline graphicsPipeline = nullptr;
+		std::unique_ptr<Pipeline> pipeline;
+
 		vk::raii::CommandPool commandPool = nullptr;
 		std::vector<Vertex> vertices;
 		std::vector<uint32_t> indices;
@@ -204,7 +150,6 @@ namespace fluffy_fox::rendering
 
 		bool framebufferResized = false;
 
-		vk::SampleCountFlagBits msaaSamples = vk::SampleCountFlagBits::e1;
 		vk::raii::Image colorImage = nullptr;
 		vk::raii::DeviceMemory colorImageMemory = nullptr;
 		vk::raii::ImageView colorImageView = nullptr;
@@ -324,214 +269,8 @@ namespace fluffy_fox::rendering
 			instance = vk::raii::Instance(context, createInfo); // TODO check for errors
 		}
 
-		void createDescriptorSetLayout()
-		{
-			std::array<vk::DescriptorSetLayoutBinding, 2> bindings {{
-				{
-					.binding = 0,
-					.descriptorType = vk::DescriptorType::eUniformBuffer,
-					.descriptorCount = 1,
-					.stageFlags = vk::ShaderStageFlagBits::eVertex
-				},
-				{
-					.binding = 1,
-					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.descriptorCount = 1,
-					.stageFlags = vk::ShaderStageFlagBits::eFragment
-				}
-			}};
-
-			vk::DescriptorSetLayoutCreateInfo layoutInfo {
-				.bindingCount = static_cast<uint32_t>(bindings.size()),
-				.pBindings = bindings.data()
-			};
-
-			descriptorSetLayout = vk::raii::DescriptorSetLayout(device->logical(), layoutInfo);
-		}
-
-		void createGraphicsPipeline()
-		{
-			std::vector<char> shaderCode = readFile("shaders/slang.spv");
-			vk::raii::ShaderModule shaderModule = createShaderModule(readFile("shaders/slang.spv"));
-
-			vk::PipelineShaderStageCreateInfo vertShaderStageInfo {
-				.stage = vk::ShaderStageFlagBits::eVertex,
-				.module = shaderModule,
-				.pName = "vertMain",
-				.pSpecializationInfo = nullptr
-			};
-
-			vk::PipelineShaderStageCreateInfo fragShaderStageInfo {
-				.stage = vk::ShaderStageFlagBits::eFragment,
-				.module = shaderModule,
-				.pName = "fragMain",
-				.pSpecializationInfo = nullptr
-			};
-
-			vk::PipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
-
-			std::vector<vk::DynamicState> dynamicStates = {
-				vk::DynamicState::eViewport,
-				vk::DynamicState::eScissor
-			};
-
-			vk::PipelineDynamicStateCreateInfo dynamicState {
-				.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
-				.pDynamicStates = dynamicStates.data()
-			};
-
-			vk::VertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
-			auto attributeDesceriptions = Vertex::getAttributeDescriptions();
-			vk::PipelineVertexInputStateCreateInfo vertexInputInfo {
-				.vertexBindingDescriptionCount = 1,
-				.pVertexBindingDescriptions = &bindingDescription,
-				.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDesceriptions.size()),
-				.pVertexAttributeDescriptions = attributeDesceriptions.data()
-			};
-
-			vk::PipelineInputAssemblyStateCreateInfo inputAssembly {
-				.topology = vk::PrimitiveTopology::eTriangleList
-			};
-
-			// vk::Viewport viewport {
-			// 	.x = 0.0f,
-			// 	.y = 0.0f,
-			// 	.width = static_cast<float>(swapChainExtent.width),
-			// 	.height = static_cast<float>(swapChainExtent.height),
-			// 	.minDepth = 0.0f,
-			// 	.maxDepth = 1.0f
-			// };
-			//
-			// vk::Rect2D scissor {
-			// 	.offset = vk::Offset2D { 0, 0 },
-			// 	.extent = swapChainExtent
-			// };
-
-			vk::PipelineViewportStateCreateInfo viewportState {
-				.viewportCount = 1,
-				// .pViewports = &viewport,
-				.scissorCount = 1,
-				// .pScissors = &scissor
-			};
-
-			vk::PipelineRasterizationStateCreateInfo rasterizer {
-				.depthClampEnable = false,
-				.rasterizerDiscardEnable = false,
-				.polygonMode = vk::PolygonMode::eFill,
-				.cullMode = vk::CullModeFlagBits::eBack,
-				.frontFace = vk::FrontFace::eCounterClockwise,
-				// .frontFace = vk::FrontFace::eClockwise,
-				.depthBiasEnable = false,
-				.lineWidth = 1.0f
-			};
-
-			vk::PipelineMultisampleStateCreateInfo multisampling {
-				.rasterizationSamples = msaaSamples,
-				.sampleShadingEnable = true, // PERF slow but better quality
-				.minSampleShading = 0.2f
-			};
-
-			vk::PipelineDepthStencilStateCreateInfo depthStencil {
-				.depthTestEnable = true,
-				.depthWriteEnable = true,
-				.depthCompareOp = vk::CompareOp::eLess,
-				.depthBoundsTestEnable = false,
-				.stencilTestEnable = false
-			};
-
-			vk::PipelineColorBlendAttachmentState colorBlendAttachment {
-				.blendEnable = true,
-				.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
-				.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
-				.colorBlendOp = vk::BlendOp::eAdd,
-				.srcAlphaBlendFactor = vk::BlendFactor::eOne,
-				.dstAlphaBlendFactor = vk::BlendFactor::eZero,
-				.alphaBlendOp = vk::BlendOp::eAdd,
-				.colorWriteMask =
-					vk::ColorComponentFlagBits::eR |
-					vk::ColorComponentFlagBits::eG |
-					vk::ColorComponentFlagBits::eB |
-					vk::ColorComponentFlagBits::eA
-			};
-
-			vk::PipelineColorBlendStateCreateInfo colorBlending
-			{
-				.logicOpEnable = false,
-				.logicOp = vk::LogicOp::eCopy,
-				.attachmentCount = 1,
-				.pAttachments = &colorBlendAttachment
-			};
-
-			vk::PipelineLayoutCreateInfo pipelineLayoutInfo {
-				.setLayoutCount = 1,
-				.pSetLayouts = &*descriptorSetLayout,
-				.pushConstantRangeCount = 0
-			};
-
-			pipelineLayout = vk::raii::PipelineLayout(device->logical(), pipelineLayoutInfo);
-
-			vk::Format depthFormat = findDepthFormat();
-
-			vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo {
-				.colorAttachmentCount = 1,
-				.pColorAttachmentFormats = &swapchain->surface_format().format,
-				.depthAttachmentFormat = depthFormat
-			};
-
-			vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo {
-				.stageCount = 2,
-				.pStages = shaderStages,
-				.pVertexInputState = &vertexInputInfo,
-				.pInputAssemblyState = &inputAssembly,
-				.pViewportState = &viewportState,
-				.pRasterizationState = &rasterizer,
-				.pMultisampleState = &multisampling,
-				.pDepthStencilState = &depthStencil,
-				.pColorBlendState = &colorBlending,
-				.pDynamicState = &dynamicState,
-				.layout = pipelineLayout,
-				.renderPass = nullptr // dynamic rendering
-			};
-
-			vk::StructureChain<
-				vk::GraphicsPipelineCreateInfo,
-				vk::PipelineRenderingCreateInfo
-			> pipelineCreateInfoChain = { graphicsPipelineCreateInfo , pipelineRenderingCreateInfo };
-
-			graphicsPipeline = vk::raii::Pipeline(device->logical(), nullptr, pipelineCreateInfoChain.get<vk::GraphicsPipelineCreateInfo>());
-		}
-
-		[[nodiscard]]
-		vk::raii::ShaderModule createShaderModule(const std::vector<char>& code) const
-		{
-			vk::ShaderModuleCreateInfo createInfo {
-				.codeSize = code.size() * sizeof(char),
-				.pCode = reinterpret_cast<const uint32_t*>(code.data())
-			};
-			vk::raii::ShaderModule shaderModule(device->logical(), createInfo);
-			return shaderModule;
-		}
-
-		static std::vector<char> readFile(const std::string& filename)
-		{
-			std::ifstream file(filename, std::ios::ate | std::ios::binary);
-
-			if (!file.is_open())
-			{
-				throw std::runtime_error("failed to open file");
-			}
-
-			std::vector<char> buffer(file.tellg());
-			file.seekg(0, std::ios::beg);
-			file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-			file.close();
-
-			return buffer;
-		}
-
 		void createCommandPool()
 		{
-			std::cout << std::to_string(device->graphics_family()) << "\n";
 			vk::CommandPoolCreateInfo poolInfo {
 				.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
 				.queueFamilyIndex = device->graphics_family()
@@ -543,11 +282,12 @@ namespace fluffy_fox::rendering
 		{
 			vk::Format colorFormat = swapchain->surface_format().format;
 
+
 			std::tie(colorImage, colorImageMemory) = createImage(
 				swapchain->extent().width,
 				swapchain->extent().height,
 				1,
-				msaaSamples,
+				pipeline->msaa_sample_count(),
 				colorFormat,
 				vk::ImageTiling::eOptimal,
 				vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eColorAttachment,
@@ -564,47 +304,18 @@ namespace fluffy_fox::rendering
 
 		void createDepthResources()
 		{
-			vk::Format depthFormat = findDepthFormat();
+			vk::Format depthFormat = pipeline->depth_format();
 			std::tie(depthImage, depthImageMemory) = createImage(
 				swapchain->extent().width,
 				swapchain->extent().height,
 				1,
-				msaaSamples,
+				pipeline->msaa_sample_count(),
 				depthFormat,
 				vk::ImageTiling::eOptimal,
 				vk::ImageUsageFlagBits::eDepthStencilAttachment,
 				vk::MemoryPropertyFlagBits::eDeviceLocal
 			);
 			depthImageView = createImageView(depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth, 1);
-		}
-
-		vk::Format findDepthFormat()
-		{
-			return findSupportedFormat(
-				{
-					vk::Format::eD32Sfloat,
-					vk::Format::eD32SfloatS8Uint,
-					vk::Format::eD24UnormS8Uint
-				},
-				vk::ImageTiling::eOptimal,
-				vk::FormatFeatureFlagBits::eDepthStencilAttachment
-			);
-		}
-
-		vk::Format findSupportedFormat(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features)
-		{
-			for (const auto format : candidates)
-			{
-				vk::FormatProperties props = device->physical().getFormatProperties(format);
-
-				if (((tiling == vk::ImageTiling::eLinear) && ((props.linearTilingFeatures & features) == features)) ||
-					((tiling == vk::ImageTiling::eOptimal) && ((props.optimalTilingFeatures & features) == features)))
-				{
-					return format;
-				}
-			}
-
-			throw std::runtime_error("failed to find supported format!");
 		}
 
 		void createTextureImage()
@@ -1025,15 +736,13 @@ namespace fluffy_fox::rendering
 			std::unordered_map<Vertex, uint32_t> unique_vertices;
 			const bool has_indices = primitive.indices != TG3_INDEX_NONE;
 
-			std::cout << std::to_string(primitive.mode == TG3_MODE_TRIANGLES) << "\n";
-
 			for (size_t i = 0; i < vertex_count; i++)
 			{
 				Vertex vertex{};
 				memcpy(&vertex.pos, &pos[i * 3], 3 * sizeof(float));
 				if (i * 2 + 1 < uv.size())
 				{
-					memcpy(&vertex.texCoord, &uv[i * 2], 2 * sizeof(float));
+					memcpy(&vertex.uv, &uv[i * 2], 2 * sizeof(float));
 				}
 
 				// inversion from Y-up to Z-up same would have to be applied to normals
@@ -1401,7 +1110,6 @@ namespace fluffy_fox::rendering
 			);
 			if (!src && accessor.count) return false;
 
-			std::cout << std::to_string(accessor.component_type) << "\n";
 			out.resize((size_t)accessor.count);
 			for (uint64_t i = 0; i < accessor.count; i++)
 			{
@@ -1572,7 +1280,7 @@ namespace fluffy_fox::rendering
 		{
 			for (auto& gameObject : gameObjects)
 			{
-				std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, *descriptorSetLayout);
+				std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, *pipeline->descriptor_set_layout());
 
 				vk::DescriptorSetAllocateInfo allocInfo {
 					.descriptorPool = descriptorPool,
@@ -1714,7 +1422,7 @@ namespace fluffy_fox::rendering
 
 			// TODO needs synchronization here?
 			commandBuffer.beginRendering(renderingInfo);
-			commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
+			commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline->pipeline());
 
 			commandBuffer.bindVertexBuffers(0, *vertexBuffer, {0});
 			commandBuffer.bindIndexBuffer(*indexBuffer, 0, vk::IndexTypeValue<decltype(indices)::value_type>::value);
@@ -1742,7 +1450,7 @@ namespace fluffy_fox::rendering
 			{
 				commandBuffer.bindDescriptorSets(
 					vk::PipelineBindPoint::eGraphics,
-					pipelineLayout,
+					pipeline->layout(),
 					0,
 					*gameObject.descriptorSets[frameIndex],
 					nullptr
@@ -1929,25 +1637,6 @@ namespace fluffy_fox::rendering
 			}
 		}
 
-		vk::SampleCountFlagBits getMaxUsableSampleCount()
-		{
-			// PERF might not be the best idea to choose the highest possible
-			vk::PhysicalDeviceProperties physicalDeviceProperties = device->physical().getProperties();
-
-			vk::SampleCountFlags counts =
-				physicalDeviceProperties.limits.framebufferColorSampleCounts &
-				physicalDeviceProperties.limits.framebufferDepthSampleCounts;
-
-			if (counts & vk::SampleCountFlagBits::e64) { return vk::SampleCountFlagBits::e64; }
-			if (counts & vk::SampleCountFlagBits::e32) { return vk::SampleCountFlagBits::e32; }
-			if (counts & vk::SampleCountFlagBits::e16) { return vk::SampleCountFlagBits::e16; }
-			if (counts & vk::SampleCountFlagBits::e8) { return vk::SampleCountFlagBits::e8; }
-			if (counts & vk::SampleCountFlagBits::e4) { return vk::SampleCountFlagBits::e4; }
-			if (counts & vk::SampleCountFlagBits::e2) { return vk::SampleCountFlagBits::e2; }
-
-			return vk::SampleCountFlagBits::e1;
-		}
-
 		void recreateSwapChain()
 		{
 			window.block_while_minimized();
@@ -1981,16 +1670,18 @@ namespace fluffy_fox::rendering
 			createInstance();
 			setupDebugMessenger();
 
+			resource_manager = std::make_unique<ResourceManager>();
+
+			// TODO make an overarching base class for render components, which has is_valid() method
 			if (!window.create_surface(instance)) { throw std::runtime_error("failed to create window surface!"); }
 			device = std::make_unique<Device>(instance, *window.surface());
 			if (!device->is_valid()) { throw std::runtime_error("failed to create window surface!"); }
 
-			msaaSamples = getMaxUsableSampleCount(); // TODO change location to a "multisampling_system"
-
 			swapchain = std::make_unique<Swapchain>(*device, window);
 
-			createDescriptorSetLayout();
-			createGraphicsPipeline();
+			pipeline = std::make_unique<Pipeline>(*resource_manager, *device, *swapchain);
+			if (!pipeline->is_valid()) { throw std::runtime_error("failed to create window surface!"); }
+
 			createCommandPool();
 			createColorResources();
 			createDepthResources();

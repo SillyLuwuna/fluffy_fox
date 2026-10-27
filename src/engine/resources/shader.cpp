@@ -1,9 +1,15 @@
 #include "engine/resources/shader.hpp"
+#include <fstream>
+
+#include "fluff/types.hpp"
+using namespace fluff::types;
 
 using namespace fluffy_fox;
 
-Shader::Shader(const std::string& id, vk::ShaderStageFlagBits shader_stage) :
+Shader::Shader(const std::string& id, Device& device, vk::ShaderStageFlagBits shader_stage) :
 	Resource(id),
+	device_(device),
+	shader_module_(nullptr),
 	stage_(shader_stage)
 {
 
@@ -16,25 +22,27 @@ Shader::~Shader()
 
 bool Shader::do_load()
 {
-	// TODO
-	// load file
-	// load shader
-	// transform data into vulkan resources
-	// cleanup cpu resources
-	throw std::runtime_error("not implemented");
+	std::vector<char> shader_code = read_file(get_id());
+	if (shader_code.empty()) return false;
+
+	vk::ShaderModuleCreateInfo create_info {
+		.codeSize = shader_code.size() * sizeof(char),
+		.pCode = reinterpret_cast<const u32*>(shader_code.data())
+	};
+
+	shader_module_ = vk::raii::ShaderModule(device_.logical(), create_info);
+
+	return true;
 }
 
 void Shader::do_unload()
 {
 	if (!is_loaded()) return;
 
-	// TODO
-	// get device
-	// destroy vk objects
-	throw std::runtime_error("not implemented");
+	shader_module_ = nullptr;
 }
 
-vk::ShaderModule Shader::get_shader_module() const
+const vk::raii::ShaderModule& Shader::get_shader_module() const
 {
 	return shader_module_;
 }

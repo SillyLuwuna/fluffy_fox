@@ -29,8 +29,8 @@ namespace fluffy_fox
 		> resources_;
 
 	public:
-		template <typename T>
-		ResourceHandle<T> load(const std::string& resource_id);
+		template <typename T, typename... Args>
+		ResourceHandle<T> load(const std::string& resource_id, Args&&... args);
 
 		template <typename T>
 		T* get_resource(const std::string& resource_id)
@@ -88,8 +88,8 @@ namespace fluffy_fox
 
 namespace fluffy_fox
 {
-	template <typename T>
-	ResourceHandle<T> ResourceManager::load(const std::string& resource_id)
+	template <typename T, typename... Args>
+	ResourceHandle<T> ResourceManager::load(const std::string& resource_id, Args&&... args)
 	{
 		static_assert(std::is_base_of<Resource, T>::value, "T must derive from Resource");
 
@@ -102,7 +102,7 @@ namespace fluffy_fox
 			return ResourceHandle<T>(resource_id, this);
 		}
 
-		std::shared_ptr<T> resource = std::make_shared<T>(resource_id);
+		std::shared_ptr<T> resource = std::make_shared<T>(resource_id, std::forward<Args>(args)...);
 		if (!resource->load())
 		{
 			return ResourceHandle<T>();
