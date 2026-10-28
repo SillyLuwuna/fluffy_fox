@@ -11,31 +11,10 @@ Pipeline::Pipeline(
 	Device& device,
 	Swapchain& swapchain
 ) :
-	msaa_sample_count_(get_max_usable_msaa_sample_count(device)),
 	descriptor_set_layout_(create_descriptor_set_layout(device)),
 	pipeline_layout_(create_pipeline_layout(device)),
-	depth_format_(find_depth_format(device)),
 	pipeline_(create_graphics_pipeline(resource_manager, device, swapchain))
 { }
-
-vk::SampleCountFlagBits Pipeline::get_max_usable_msaa_sample_count(Device& device) const
-{
-	// PERF might not be the best idea to choose the highest possible
-	vk::PhysicalDeviceProperties physical_device_properties = device.physical().getProperties();
-
-	vk::SampleCountFlags counts =
-		physical_device_properties.limits.framebufferColorSampleCounts &
-		physical_device_properties.limits.framebufferDepthSampleCounts;
-
-	if (counts & vk::SampleCountFlagBits::e64) { return vk::SampleCountFlagBits::e64; }
-	if (counts & vk::SampleCountFlagBits::e32) { return vk::SampleCountFlagBits::e32; }
-	if (counts & vk::SampleCountFlagBits::e16) { return vk::SampleCountFlagBits::e16; }
-	if (counts & vk::SampleCountFlagBits::e8) { return vk::SampleCountFlagBits::e8; }
-	if (counts & vk::SampleCountFlagBits::e4) { return vk::SampleCountFlagBits::e4; }
-	if (counts & vk::SampleCountFlagBits::e2) { return vk::SampleCountFlagBits::e2; }
-
-	return vk::SampleCountFlagBits::e1;
-}
 
 vk::raii::DescriptorSetLayout Pipeline::create_descriptor_set_layout(Device& device) const
 {
@@ -98,7 +77,7 @@ vk::raii::Pipeline Pipeline::create_graphics_pipeline(
 	vk::PipelineInputAssemblyStateCreateInfo input_assembly = get_input_assembly();
 	vk::PipelineViewportStateCreateInfo viewport_state = get_viewport_state();
 	vk::PipelineRasterizationStateCreateInfo rasterizer = get_rasterizer();
-	vk::PipelineMultisampleStateCreateInfo multisampler = get_multisampler();
+	vk::PipelineMultisampleStateCreateInfo multisampler = get_multisampler(device);
 	vk::PipelineDepthStencilStateCreateInfo depth_stencil = get_depth_stencil();
 
 	vk::PipelineColorBlendAttachmentState color_blend_attachment = get_color_blend_attachment();
@@ -231,10 +210,10 @@ vk::PipelineRasterizationStateCreateInfo Pipeline::get_rasterizer() const
 	};
 }
 
-vk::PipelineMultisampleStateCreateInfo Pipeline::get_multisampler() const
+vk::PipelineMultisampleStateCreateInfo Pipeline::get_multisampler(Device& device) const
 {
 	return {
-		.rasterizationSamples = msaa_sample_count_,
+		.rasterizationSamples = device.msaa_sample_count(),
 		.sampleShadingEnable = true, // PERF slow but better quality
 		.minSampleShading = 0.2f
 	};
@@ -289,43 +268,8 @@ vk::PipelineRenderingCreateInfo Pipeline::get_pipeline_rendering_create_info(
 	return {
 		.colorAttachmentCount = 1,
 		.pColorAttachmentFormats = &swapchain.surface_format().format,
-		.depthAttachmentFormat = depth_format_
+		.depthAttachmentFormat = device.depth_format()
 	};
-}
-
-vk::Format Pipeline::find_depth_format(Device& device) const
-{
-	return find_supported_format(
-		device,
-		{
-			vk::Format::eD32Sfloat,
-			vk::Format::eD32SfloatS8Uint,
-			vk::Format::eD24UnormS8Uint
-		},
-		vk::ImageTiling::eOptimal,
-		vk::FormatFeatureFlagBits::eDepthStencilAttachment
-	);
-}
-
-vk::Format Pipeline::find_supported_format(
-	Device& device,
-	const std::vector<vk::Format>& candidates,
-	vk::ImageTiling tiling,
-	vk::FormatFeatureFlags features
-) const
-{
-	for (const auto format : candidates)
-	{
-		vk::FormatProperties props = device.physical().getFormatProperties(format);
-
-		if (((tiling == vk::ImageTiling::eLinear) && ((props.linearTilingFeatures & features) == features)) ||
-			((tiling == vk::ImageTiling::eOptimal) && ((props.optimalTilingFeatures & features) == features)))
-		{
-			return format;
-		}
-	}
-
-	throw std::runtime_error("failed to find supported format!");
 }
 
 bool Pipeline::is_valid() const

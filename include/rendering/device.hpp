@@ -43,6 +43,10 @@ namespace fluffy_fox::rendering
 		vk::raii::PhysicalDevice physical_device_;
 		vk::raii::Device device_;
 
+		vk::SampleCountFlagBits msaa_sample_count_;
+		vk::raii::CommandPool graphics_command_pool_;
+		vk::Format depth_format_;
+
 		static vk::raii::PhysicalDevice choose_physical_device(vk::raii::Instance& instance);
 		static bool is_physical_device_suitable(vk::raii::PhysicalDevice& device);
 		static bool supports_vulkan_version(vk::raii::PhysicalDevice& device, u32 version);
@@ -66,6 +70,15 @@ namespace fluffy_fox::rendering
 		void create_compute_queues(std::vector<vk::DeviceQueueCreateInfo>& out);
 		static void init_queue(QueueInfo& queue, vk::raii::Device& device);
 
+		vk::SampleCountFlagBits get_max_usable_msaa_sample_count() const;
+		vk::raii::CommandPool create_command_pool(u32 family) const;
+		vk::Format find_depth_format() const;
+		vk::Format find_supported_format(
+			const std::vector<vk::Format>& candidates,
+			vk::ImageTiling tiling,
+			vk::FormatFeatureFlags features
+		) const;
+
 	public:
 		Device(vk::raii::Instance& instance, vk::SurfaceKHR surface);
 
@@ -82,5 +95,10 @@ namespace fluffy_fox::rendering
 		inline u32 present_family() const { return present_.family; }
 		inline u32 transfer_family() const { return transfer_.family; }
 		inline u32 compute_family() const { return compute_.family; }
+
+		inline vk::SampleCountFlagBits msaa_sample_count() const { return msaa_sample_count_; }
+		inline vk::raii::CommandPool& graphics_command_pool() { return graphics_command_pool_; }
+		inline vk::Format depth_format() const { return depth_format_; }
+		// TODO others
 	};
 }

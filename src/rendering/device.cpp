@@ -4,10 +4,26 @@ using namespace fluffy_fox::rendering;
 
 Device::Device(vk::raii::Instance& instance, vk::SurfaceKHR surface) :
 	physical_device_(choose_physical_device(instance)),
-	device_(create_logical_device(physical_device_, surface))
+	device_(create_logical_device(physical_device_, surface)),
+	msaa_sample_count_(get_max_usable_msaa_sample_count()),
+	graphics_command_pool_(create_command_pool(graphics_family())),
+	depth_format_(find_depth_format())
 	// TODO error handling, what if both of these end up being nullptr? how should other
 	// classes know and deal with it?
-{ }
+{
+
+	init_queue(graphics_, device_);
+	// init_queue(present_, device_);
+	// init_queue(transfer_, device_);
+	// init_queue(compute_, device_);
+
+	// TODO mix command pools, make this abstract.
+	// different families might have the same index,
+	// meaning that they should have the same queue and
+	// command pool! However, the API should display them
+	// as if they were separate, regardless if they're actually
+	// just the same queue/command_pool
+}
 
 // returns nullptr if there is no suitable device
 vk::raii::PhysicalDevice Device::choose_physical_device(vk::raii::Instance& instance)
@@ -149,11 +165,6 @@ vk::raii::Device Device::create_logical_device(vk::raii::PhysicalDevice& physica
 	};
 
 	vk::raii::Device device = vk::raii::Device(physical_device, device_create_info);
-
-	init_queue(graphics_, device);
-	// init_queue(present_, device);
-	// init_queue(transfer_, device);
-	// init_queue(compute_, device);
 
 	return std::move(device);
 }
@@ -382,7 +393,70 @@ void Device::create_compute_queues(std::vector<vk::DeviceQueueCreateInfo>& out)
 	// out.emplace_back(queue_create_info);
 }
 
+vk::raii::CommandPool Device::create_command_pool(u32 family) const
+{
+	vk::CommandPoolCreateInfo pool_info {
+		.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+		.queueFamilyIndex = family
+	};
+
+	return vk::raii::CommandPool(device_, pool_info);
+}
+
+vk::SampleCountFlagBits Device::get_max_usable_msaa_sample_count() const
+{
+	// PERF might not be the best idea to choose the highest possible
+	vk::PhysicalDeviceProperties physical_device_properties = physical_device_.getProperties();
+
+	vk::SampleCountFlags counts =
+		physical_device_properties.limits.framebufferColorSampleCounts &
+		physical_device_properties.limits.framebufferDepthSampleCounts;
+
+	if (counts & vk::SampleCountFlagBits::e64) { return vk::SampleCountFlagBits::e64; }
+	if (counts & vk::SampleCountFlagBits::e32) { return vk::SampleCountFlagBits::e32; }
+	if (counts & vk::SampleCountFlagBits::e16) { return vk::SampleCountFlagBits::e16; }
+	if (counts & vk::SampleCountFlagBits::e8) { return vk::SampleCountFlagBits::e8; }
+	if (counts & vk::SampleCountFlagBits::e4) { return vk::SampleCountFlagBits::e4; }
+	if (counts & vk::SampleCountFlagBits::e2) { return vk::SampleCountFlagBits::e2; }
+
+	return vk::SampleCountFlagBits::e1;
+}
+
 bool Device::is_valid()
 {
 	return (physical_device_ != nullptr) && (device_ != nullptr);
+}
+
+vk::Format Device::find_depth_format() const
+{
+	return find_supported_format(
+		{
+			vk::Format::eD32Sfloat,
+			vk::Format::eD32SfloatS8Uint,
+			vk::Format::eD24UnormS8Uint
+		},
+		vk::ImageTiling::eOptimal,
+		vk::FormatFeatureFlagBits::eDepthStencilAttachment
+	);
+}
+
+vk::Format Device::find_supported_format(
+	const std::vector<vk::Format>& candidates,
+	vk::ImageTiling tiling,
+	vk::FormatFeatureFlags features
+) const
+{
+	for (const auto format : candidates)
+	{
+		vk::FormatProperties props = physical_device_.getFormatProperties(format);
+
+		if (((tiling == vk::ImageTiling::eLinear) && ((props.linearTilingFeatures & features) == features)) ||
+			((tiling == vk::ImageTiling::eOptimal) && ((props.optimalTilingFeatures & features) == features)))
+		{
+			return format;
+		}
+	}
+
+	// FIXME remove exception
+	throw std::runtime_error("failed to find supported format!");
 }

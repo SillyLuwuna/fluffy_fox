@@ -119,7 +119,6 @@ namespace fluffy_fox::rendering
 		std::unique_ptr<Swapchain> swapchain;
 		std::unique_ptr<Pipeline> pipeline;
 
-		vk::raii::CommandPool commandPool = nullptr;
 		std::vector<Vertex> vertices;
 		std::vector<uint32_t> indices;
 		// PERF vertexBuffer and indexBuffer should be the same buffer for performance
@@ -138,10 +137,6 @@ namespace fluffy_fox::rendering
 		bool hasTextureDecoded = false;
 		DecodedImage textureDecoded;
 
-		vk::raii::Image depthImage = nullptr;
-		vk::raii::DeviceMemory depthImageMemory = nullptr;
-		vk::raii::ImageView depthImageView = nullptr;
-
 		std::vector<vk::raii::CommandBuffer> commandBuffers;
 		std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
 		std::vector<vk::raii::Semaphore> renderFinishedSemaphores;
@@ -149,10 +144,6 @@ namespace fluffy_fox::rendering
 		uint32_t frameIndex = 0;
 
 		bool framebufferResized = false;
-
-		vk::raii::Image colorImage = nullptr;
-		vk::raii::DeviceMemory colorImageMemory = nullptr;
-		vk::raii::ImageView colorImageView = nullptr;
 
 		std::array<GameObject, MAX_OBJECTS> gameObjects;
 
@@ -269,55 +260,6 @@ namespace fluffy_fox::rendering
 			instance = vk::raii::Instance(context, createInfo); // TODO check for errors
 		}
 
-		void createCommandPool()
-		{
-			vk::CommandPoolCreateInfo poolInfo {
-				.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-				.queueFamilyIndex = device->graphics_family()
-			};
-			commandPool = vk::raii::CommandPool(device->logical(), poolInfo);
-		}
-
-		void createColorResources()
-		{
-			vk::Format colorFormat = swapchain->surface_format().format;
-
-
-			std::tie(colorImage, colorImageMemory) = createImage(
-				swapchain->extent().width,
-				swapchain->extent().height,
-				1,
-				pipeline->msaa_sample_count(),
-				colorFormat,
-				vk::ImageTiling::eOptimal,
-				vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eColorAttachment,
-				vk::MemoryPropertyFlagBits::eDeviceLocal
-			);
-
-			colorImageView = createImageView(
-				colorImage,
-				colorFormat,
-				vk::ImageAspectFlagBits::eColor,
-				1
-			);
-		}
-
-		void createDepthResources()
-		{
-			vk::Format depthFormat = pipeline->depth_format();
-			std::tie(depthImage, depthImageMemory) = createImage(
-				swapchain->extent().width,
-				swapchain->extent().height,
-				1,
-				pipeline->msaa_sample_count(),
-				depthFormat,
-				vk::ImageTiling::eOptimal,
-				vk::ImageUsageFlagBits::eDepthStencilAttachment,
-				vk::MemoryPropertyFlagBits::eDeviceLocal
-			);
-			depthImageView = createImageView(depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth, 1);
-		}
-
 		void createTextureImage()
 		{
 			if (!USE_MODEL_TEXTURE)
@@ -373,6 +315,8 @@ namespace fluffy_fox::rendering
 			// transitioned to vk::ImageLayout::eShaderReadOnlyOptimal while generating mipmaps
 			generateMipmaps(commandBuffer, textureImage, vk::Format::eR8G8B8A8Srgb, textureDecoded.width, textureDecoded.height, mipLevels);
 			endSingleTimeCommands(std::move(commandBuffer));
+
+			textureImageView = createImageView(*textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor, mipLevels);
 		}
 
 		void generateMipmaps(
@@ -521,7 +465,7 @@ namespace fluffy_fox::rendering
 		vk::raii::CommandBuffer beginSingleTimeCommands()
 		{
 			vk::CommandBufferAllocateInfo allocInfo {
-				.commandPool = commandPool,
+				.commandPool = device->graphics_command_pool(),
 				.level = vk::CommandBufferLevel::ePrimary,
 				.commandBufferCount = 1
 			};
@@ -617,11 +561,6 @@ namespace fluffy_fox::rendering
 			};
 
 			commandBuffer.copyBufferToImage(buffer, image, vk::ImageLayout::eTransferDstOptimal, region);
-		}
-
-		void createTextureImageView()
-		{
-			textureImageView = createImageView(*textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor, mipLevels);
 		}
 
 		vk::raii::ImageView createImageView(vk::Image const& image, vk::Format format, vk::ImageAspectFlags aspectFlags, uint32_t mipLevels) const
@@ -1137,7 +1076,7 @@ namespace fluffy_fox::rendering
 		void createCommandBuffers()
 		{
 			vk::CommandBufferAllocateInfo allocInfo {
-				.commandPool = commandPool,
+				.commandPool = device->graphics_command_pool(),
 				.level = vk::CommandBufferLevel::ePrimary,
 				.commandBufferCount = MAX_FRAMES_IN_FLIGHT
 			};
@@ -1365,7 +1304,7 @@ namespace fluffy_fox::rendering
 
 			transition_image_layout(
 				commandBuffer,
-				*colorImage,
+				*swapchain->color().image(),
 				vk::ImageLayout::eUndefined,
 				vk::ImageLayout::eColorAttachmentOptimal,
 				vk::AccessFlagBits2::eColorAttachmentWrite,
@@ -1377,7 +1316,7 @@ namespace fluffy_fox::rendering
 
 			transition_image_layout(
 				commandBuffer,
-				*depthImage,
+				*swapchain->depth().image(),
 				vk::ImageLayout::eUndefined,
 				vk::ImageLayout::eDepthAttachmentOptimal,
 				vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
@@ -1391,7 +1330,7 @@ namespace fluffy_fox::rendering
 			vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
 
 			vk::RenderingAttachmentInfo colorAttachmentInfo = {
-				.imageView = colorImageView,
+				.imageView = swapchain->color().image_view(),
 				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
 				.resolveMode = vk::ResolveModeFlagBits::eAverage,
 				.resolveImageView = swapchain->image_views()[imageIndex],
@@ -1402,7 +1341,7 @@ namespace fluffy_fox::rendering
 			};
 
 			vk::RenderingAttachmentInfo depthAttachmentInfo = {
-				.imageView = depthImageView,
+				.imageView = swapchain->depth().image_view(),
 				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
 				.loadOp = vk::AttachmentLoadOp::eClear,
 				.storeOp = vk::AttachmentStoreOp::eDontCare,
@@ -1646,8 +1585,7 @@ namespace fluffy_fox::rendering
 			device->logical().waitIdle();
 
 			swapchain->recreate(*device, window);
-			createColorResources();
-			createDepthResources();
+			// check if valid
 		}
 
 		void framebufferResizeCallback(int , int )
@@ -1674,21 +1612,19 @@ namespace fluffy_fox::rendering
 
 			// TODO make an overarching base class for render components, which has is_valid() method
 			if (!window.create_surface(instance)) { throw std::runtime_error("failed to create window surface!"); }
+
 			device = std::make_unique<Device>(instance, *window.surface());
-			if (!device->is_valid()) { throw std::runtime_error("failed to create window surface!"); }
+			if (!device->is_valid()) { throw std::runtime_error("failed to create device!"); }
 
 			swapchain = std::make_unique<Swapchain>(*device, window);
+			if (!swapchain->is_valid()) { throw std::runtime_error("failed to create swapchain!"); }
 
 			pipeline = std::make_unique<Pipeline>(*resource_manager, *device, *swapchain);
-			if (!pipeline->is_valid()) { throw std::runtime_error("failed to create window surface!"); }
+			if (!pipeline->is_valid()) { throw std::runtime_error("failed to create pipeline!"); }
 
-			createCommandPool();
-			createColorResources();
-			createDepthResources();
 			loadModel();
 			setupGameObjects();
 			createTextureImage();
-			createTextureImageView();
 			createTextureSampler();
 			createVertexBuffer();
 			createIndexBuffer();

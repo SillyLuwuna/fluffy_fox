@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rendering/device.hpp"
+#include "rendering/image.hpp"
 #include "rendering/window.hpp"
 
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
@@ -20,6 +21,8 @@ namespace fluffy_fox::rendering
 		vk::raii::SwapchainKHR swapchain_;
 		std::vector<vk::Image> images_;
 		std::vector<vk::raii::ImageView> image_views_;
+		Image color_;
+		Image depth_;
 
 		static vk::Extent2D choose_extent(Device& device, const Window& window);
 		static vk::SurfaceFormatKHR choose_surface_format(Device& device, const Window& window);
@@ -27,6 +30,8 @@ namespace fluffy_fox::rendering
 		static u32 choose_min_image_count(Device& device, const Window& window);
 		vk::raii::SwapchainKHR create_swapchain(Device& device, const Window& window);
 		std::vector<vk::raii::ImageView> create_image_views(Device& device);
+		Image create_color_image(Device& device) const;
+		Image create_depth_image(Device& device) const;
 
 	public:
 		Swapchain(Device& device, const Window& window);
@@ -38,5 +43,9 @@ namespace fluffy_fox::rendering
 		inline std::vector<vk::raii::ImageView>& image_views() { return image_views_; }
 
 		void recreate(Device& device, const Window& window);
+		bool is_valid() const;
+
+		inline Image& color() { return color_; }
+		inline Image& depth() { return depth_; }
 	};
 }

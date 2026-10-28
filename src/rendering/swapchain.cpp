@@ -9,7 +9,9 @@ Swapchain::Swapchain(Device& device, const Window& window) :
 	surface_format_(choose_surface_format(device, window)),
 	swapchain_(create_swapchain(device, window)),
 	images_(swapchain_.getImages()),
-	image_views_(create_image_views(device))
+	image_views_(create_image_views(device)),
+	color_(create_color_image(device)),
+	depth_(create_depth_image(device))
 { }
 
 vk::Extent2D Swapchain::choose_extent(Device& device, const Window& window)
@@ -139,4 +141,43 @@ void Swapchain::recreate(Device& device, const Window& window)
 	swapchain_ = create_swapchain(device, window);
 	images_ = swapchain_.getImages();
 	image_views_ = create_image_views(device);
+	color_ = create_color_image(device);
+	depth_ = create_depth_image(device);
+}
+
+Image Swapchain::create_color_image(Device& device) const
+{
+	return Image(
+		device,
+		extent_.width,
+		extent_.height,
+		1,
+		device.msaa_sample_count(),
+		surface_format_.format,
+		vk::ImageTiling::eOptimal,
+		vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eColorAttachment,
+		vk::MemoryPropertyFlagBits::eDeviceLocal,
+		vk::ImageAspectFlagBits::eColor
+	);
+}
+
+Image Swapchain::create_depth_image(Device& device) const
+{
+	return Image(
+		device,
+		extent_.width,
+		extent_.height,
+		1,
+		device.msaa_sample_count(),
+		device.depth_format(),
+		vk::ImageTiling::eOptimal,
+		vk::ImageUsageFlagBits::eDepthStencilAttachment,
+		vk::MemoryPropertyFlagBits::eDeviceLocal,
+		vk::ImageAspectFlagBits::eDepth
+	);
+}
+
+bool Swapchain::is_valid() const
+{
+	return color_.is_valid() && depth_.is_valid();
 }
