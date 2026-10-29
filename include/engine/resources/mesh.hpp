@@ -1,6 +1,7 @@
 #pragma once
 
-#include "engine/resources/primitive.hpp"
+#include "engine/resources/geometry.hpp"
+#include "engine/resources/texture.hpp"
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan_raii.hpp>
 #define TINYGLTF3_ENABLE_FS
@@ -15,10 +16,27 @@ using namespace fluff::types;
 
 namespace fluffy_fox
 {
+	// FIXME
+	// target topology (each primitive should be a draw call):
+	// Mesh
+	// |-- VertexBuffer (shared)
+	// |-- IndexBuffer (shared)
+	// |-- Primitives[]
+	//     |-- indexOffset
+	//     |-- indexCount
+	//     |-- Material* -> Material
+	//                      |-- Shader/Pipeline (?)
+	//                      |-- Textures
+	//                      |-- Parameters (albedo, normal, ...)
+
 	class Mesh : public Resource
 	{
 	private:
-		std::vector<Primitive> primitives_;
+		ResourceManager& resource_manager_;
+		ResourceHandle<GltfFile> gltf_file_;
+		u32 mesh_idx_;
+		std::vector<Geometry> geometry_;
+		std::vector<ResourceHandle<Texture>> textures_;
 	
 	protected:
 		bool do_load() override;
@@ -27,7 +45,13 @@ namespace fluffy_fox
 		void print_error(tinygltf3::ErrorStack& errors);
 
 	public:
-		explicit Mesh(const std::string& id);
+		explicit Mesh(
+			const std::string& id,
+			ResourceManager& resource_manager,
+			ResourceHandle<GltfFile> gltf_file,
+			u32 mesh_idx
+		);
+
 		~Mesh() override;
 	};
 }

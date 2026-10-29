@@ -23,7 +23,23 @@ namespace fluffy_fox
 			resource_manager_(manager)
 		{ }
 
+		ResourceHandle(const ResourceHandle& other);
+		ResourceHandle& operator=(const ResourceHandle& other);
 		~ResourceHandle();
+
+		ResourceHandle(ResourceHandle&& other) :
+			resource_id_(std::move(other.resource_id_)),
+			resource_manager_(other.resource_manager_)
+		{ }
+
+		ResourceHandle& operator=(ResourceHandle&& other)
+		{
+			resource_id_ = std::move(other.resource_id_);
+			resource_manager_ = other.resource_manager_;
+			return *this;
+		}
+
+		ResourceHandle& operator=(std::nullptr_t null);
 
 		T* get() const;
 		bool is_valid() const;
@@ -72,5 +88,36 @@ namespace fluffy_fox
 	{
 		if (!resource_manager_) return;
 		resource_manager_->release<T>(resource_id_);
+	}
+
+	template<typename T>
+	ResourceHandle<T>::ResourceHandle(const ResourceHandle<T>& other) :
+		resource_id_(other.resource_id_),
+		resource_manager_(other.resource_manager_)
+	{
+		if (!resource_manager_) return;
+		resource_manager_->increment_ref_count<T>(resource_id_);
+	}
+
+	template<typename T>
+	ResourceHandle<T>& ResourceHandle<T>::operator=(const ResourceHandle<T>& other)
+	{
+		resource_id_ = other.resource_id_;
+		resource_manager_ = other.resource_manager_;
+
+		if (!resource_manager_) return;
+		resource_manager_->increment_ref_count<T>(resource_id_);
+
+		return *this;
+	}
+
+	template<typename T>
+	ResourceHandle<T>& ResourceHandle<T>::operator=(std::nullptr_t)
+	{
+		if (!resource_manager_) return;
+
+		resource_manager_->release<T>(resource_id_);
+
+		return *this;
 	}
 }

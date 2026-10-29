@@ -28,10 +28,6 @@ namespace fluffy_fox
 			std::unordered_map<std::string, ResourceData>
 		> resources_;
 
-	public:
-		template <typename T, typename... Args>
-		ResourceHandle<T> load(const std::string& resource_id, Args&&... args);
-
 		template <typename T>
 		T* get_resource(const std::string& resource_id)
 		{
@@ -47,29 +43,15 @@ namespace fluffy_fox
 		}
 
 		template <typename T>
-		bool has_resource(const std::string& resource_id)
-		{
-			return resources_.contains(std::type_index(typeid(T)));
-		}
+		void release(const std::string& resource_id);
 
 		template <typename T>
-		void release(const std::string& resource_id)
+		void increment_ref_count(const std::string& resource_id)
 		{
-			auto& type_resources = resources_[std::type_index(typeid(T))];
-			auto it = type_resources.find(resource_id);
-
-			if (it == type_resources.end()) return;
-
-			ResourceData& resource_data = it->second;
-
-			resource_data.ref_count--;
-
-			if (resource_data.ref_count > 0) return;
-
-			resource_data.resource->unload();
-			type_resources.erase(it);
+			resources_[std::type_index(typeid(T))][resource_id].ref_count++;
 		}
 
+		// FIXME use this in destructor
 		void unload_all()
 		{
 			for (auto& [type, type_resources] : resources_)
@@ -80,6 +62,22 @@ namespace fluffy_fox
 				}
 				type_resources.clear();
 			}
+		}
+
+		template <typename T>
+		friend class ResourceHandle;
+
+	public:
+		template <typename T, typename... Args>
+		ResourceHandle<T> load(const std::string& resource_id, Args&&... args);
+
+		// template <typename T>
+		// ResourceHandle<T> get(const std::string& resource_id);
+
+		template <typename T>
+		bool has_resource(const std::string& resource_id)
+		{
+			return resources_[std::type_index(typeid(T))].contains(resource_id);
 		}
 	};
 }
@@ -113,4 +111,41 @@ namespace fluffy_fox
 
 		return ResourceHandle<T>(resource_id, this);
 	}
+
+	template <typename T>
+	void ResourceManager::release(const std::string& resource_id)
+	{
+		auto& type_resources = resources_[std::type_index(typeid(T))];
+		auto it = type_resources.find(resource_id);
+
+		if (it == type_resources.end()) return;
+
+		ResourceData& resource_data = it->second;
+
+		resource_data.ref_count--;
+
+		if (resource_data.ref_count > 0) return;
+
+		resource_data.resource->unload();
+		type_resources.erase(it);
+	}
+
+	// template <typename T>
+	// ResourceHandle<T> ResourceManager::get(const std::string& resource_id)
+	// {
+	// 	static_assert(std::is_base_of<Resource, T>::value, "T must derive from Resource");
+	//
+	// 	auto& type_resources = resources_[std::type_index(typeid(T))];
+	// 	auto it = type_resources.find(resource_id);
+	//
+	// 	if (it == type_resources.end())
+	// 	{
+	// 		return ResourceHandle<T>();
+	// 	}
+	//
+	// 	type_resources[resource_id].ref_count++;
+	// 	return ResourceHandle<T>(resource_id, this);
+	//
+	// 	return nullptr;
+	// }
 }

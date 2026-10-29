@@ -1,5 +1,7 @@
 #pragma once
 
+#include "engine/resource_handle.hpp"
+#include "engine/resources/gltf_file.hpp"
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan_raii.hpp>
 #define TINYGLTF3_ENABLE_FS
@@ -17,32 +19,33 @@ using namespace fluff::types;
 
 #include "engine/resource.hpp"
 #include "rendering/buffer.hpp"
-#include "rendering/gltf_reader.hpp"
 
 using namespace fluffy_fox::rendering;
 
 namespace fluffy_fox
 {
-	class Primitive
+	class Geometry
 	{
 	private:
-		const tg3_primitive& primitive_;
-
 		Buffer vertex_buffer_;
 		u32 vertex_count_;
 
 		Buffer index_buffer_;
 		u32 index_count_;
-	
+
+		bool is_valid_;
+
+		bool load(GltfFile& gltf_file, const tg3_primitive& primitive);
+
 		static bool load_primitive(
-			GltfReader& gltf_reader,
+			GltfFile& gltf_file,
 			const tg3_primitive& primitive,
 			std::vector<glm::vec3>& vertices,
 			std::vector<u32>& indices
 		);
 
 		static bool add_vertices(
-			GltfReader& gltf_reader,
+			GltfFile& gltf_file,
 			const tg3_primitive& primitive,
 			const std::vector<f32>& positions,
 			std::vector<glm::vec3>& vertices,
@@ -50,16 +53,18 @@ namespace fluffy_fox
 		);
 
 		static bool load_vertices(
-			GltfReader& gltf_reader,
+			GltfFile& gltf_file,
 			const tg3_primitive& primitive,
 			const std::vector<glm::vec3>& vertices,
 			std::vector<u32>& indices
 		);
 
 	public:
-		explicit Primitive(const std::string& id, u32 mesh_idx, u32 primitive_idx);
-		~Primitive();
+		Geometry(GltfFile& gltf_file, const tg3_primitive& primitive);
+		Geometry(Geometry&& other);
+		~Geometry();
 
+		inline bool is_valid() const { return is_valid_; }
 		inline const vk::Buffer vertex_buffer() const { return vertex_buffer_.buffer(); }
 		inline const vk::Buffer index_buffer() const { return index_buffer_.buffer(); }
 		inline u32 vertex_count() const { return vertex_count_; }

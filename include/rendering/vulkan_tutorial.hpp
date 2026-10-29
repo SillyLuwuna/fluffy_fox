@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/resources/mesh.hpp"
 #include "rendering/swapchain.hpp"
 #include <iostream>
 // #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
@@ -17,8 +18,8 @@
 #define TINYGLTF3_ENABLE_FS
 #define TINYGLTF3_IMPLEMENTATION
 #include <tiny_gltf_v3.h>
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+// #define STB_IMAGE_IMPLEMENTATION
+// #include <stb_image.h>
 
 #include "rendering/window.hpp"
 #include "rendering/device.hpp"
@@ -117,10 +118,10 @@ namespace fluffy_fox::rendering
 		vk::raii::SurfaceKHR surface = nullptr; // FIXME
 		std::unique_ptr<Swapchain> swapchain;
 		std::unique_ptr<Pipeline> pipeline;
+		ResourceHandle<Mesh> mesh;
 
 		std::vector<Vertex> vertices;
 		std::vector<uint32_t> indices;
-		// PERF vertexBuffer and indexBuffer should be the same buffer for performance
 		vk::raii::Buffer vertexBuffer = nullptr;
 		vk::raii::DeviceMemory vertexBufferMemory = nullptr;
 		vk::raii::Buffer indexBuffer = nullptr;
@@ -1625,6 +1626,8 @@ namespace fluffy_fox::rendering
 
 			pipeline = std::make_unique<Pipeline>(*resource_manager, *device, *swapchain);
 			if (!pipeline->is_valid()) { throw std::runtime_error("failed to create pipeline!"); }
+
+			mesh = resource_manager->load<Mesh>(MODEL_PATH);
 
 			loadModel();
 			setupGameObjects();

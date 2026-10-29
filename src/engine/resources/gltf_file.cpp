@@ -1,22 +1,21 @@
-#include "rendering/gltf_reader.hpp"
+#include "engine/resources/gltf_file.hpp"
 #include <iostream>
 
-using namespace fluffy_fox::rendering;
+using namespace fluffy_fox;
 
-GltfReader::GltfReader() :
-	loaded_(false)
+GltfFile::GltfFile(const std::string& id) :
+	Resource(id)
+{ }
+
+GltfFile::~GltfFile()
 {
+	unload();
 }
 
-GltfReader::~GltfReader()
-{
-
-}
-
-bool GltfReader::load(const std::string& file)
+bool GltfFile::do_load()
 {
 	tinygltf3::ErrorStack errors;
-	tg3_error_code err = tinygltf3::parse_file(model_, errors, file.c_str());
+	tg3_error_code err = tinygltf3::parse_file(model_, errors, get_id().c_str());
 
 	if (err != TG3_OK)
 	{
@@ -27,7 +26,15 @@ bool GltfReader::load(const std::string& file)
 	return true;
 }
 
-void GltfReader::print_error(tinygltf3::ErrorStack& errors)
+
+void GltfFile::do_unload()
+{
+	if (!is_loaded()) return;
+
+	model_ = {};
+}
+
+void GltfFile::print_error(tinygltf3::ErrorStack& errors)
 {
 	std::string error;
 	for (uint32_t i = 0; i < errors.count(); i++)
@@ -38,7 +45,7 @@ void GltfReader::print_error(tinygltf3::ErrorStack& errors)
 	std::cout << error << "\n";
 }
 
-i32 GltfReader::find_attribute(const tg3_primitive& primitive, const char* name)
+i32 GltfFile::find_attribute(const tg3_primitive& primitive, const char* name)
 {
 	for (u32 i = 0; i < primitive.attributes_count; i++)
 	{

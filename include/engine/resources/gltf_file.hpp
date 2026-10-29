@@ -1,6 +1,7 @@
 #pragma once
 
-#include <vector>
+#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
+#include <vulkan/vulkan_raii.hpp>
 #define TINYGLTF3_ENABLE_FS
 #define TINYGLTF3_IMPLEMENTATION
 #include <tiny_gltf_v3.h>
@@ -8,17 +9,15 @@
 #include <fluff/types.hpp>
 using namespace fluff::types;
 
-#include <string>
+#include "engine/resource.hpp"
 
-
-namespace fluffy_fox::rendering
+namespace fluffy_fox
 {
 
-class GltfReader
+class GltfFile : public Resource
 {
 private:
 	tinygltf3::Model model_;
-	bool loaded_;
 
 	void print_error(tinygltf3::ErrorStack& errors);
 
@@ -153,11 +152,14 @@ private:
 		return (T)0.0f;
 	}
 
-public:
-	GltfReader();
-	~GltfReader();
+protected:
+	bool do_load() override;
+	void do_unload() override;
 
-	bool load(const std::string& file);
+public:
+	explicit GltfFile(const std::string& id);
+	~GltfFile() override;
+
 	inline const tinygltf3::Model& model() const { return model_; }
 
 	static i32 find_attribute(const tg3_primitive& primitive, const char* name);
@@ -185,7 +187,6 @@ public:
 
 		return true;
 	}
-
 };
 
 }
