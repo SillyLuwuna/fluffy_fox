@@ -1,22 +1,20 @@
 #include "rendering/pipeline.hpp"
 
 #include "rendering/vertex.hpp"
-#include <iostream>
 
 using namespace fluffy_fox;
 using namespace fluffy_fox::rendering;
 
 Pipeline::Pipeline(
 	ResourceManager& resource_manager,
-	Device& device,
 	Swapchain& swapchain
 ) :
-	descriptor_set_layout_(create_descriptor_set_layout(device)),
-	pipeline_layout_(create_pipeline_layout(device)),
-	pipeline_(create_graphics_pipeline(resource_manager, device, swapchain))
+	descriptor_set_layout_(create_descriptor_set_layout()),
+	pipeline_layout_(create_pipeline_layout()),
+	pipeline_(create_graphics_pipeline(resource_manager, swapchain))
 { }
 
-vk::raii::DescriptorSetLayout Pipeline::create_descriptor_set_layout(Device& device) const
+vk::raii::DescriptorSetLayout Pipeline::create_descriptor_set_layout() const
 {
 	std::vector<vk::DescriptorSetLayoutBinding> bindings = get_descriptor_set_layout_bindings();
 
@@ -25,7 +23,7 @@ vk::raii::DescriptorSetLayout Pipeline::create_descriptor_set_layout(Device& dev
 		.pBindings = bindings.data()
 	};
 
-	return vk::raii::DescriptorSetLayout(device.logical(), layout_info);
+	return vk::raii::DescriptorSetLayout(Device::instance().logical(), layout_info);
 }
 
 std::vector<vk::DescriptorSetLayoutBinding> Pipeline::get_descriptor_set_layout_bindings() const
@@ -46,7 +44,7 @@ std::vector<vk::DescriptorSetLayoutBinding> Pipeline::get_descriptor_set_layout_
 	};
 }
 
-vk::raii::PipelineLayout Pipeline::create_pipeline_layout(Device& device) const
+vk::raii::PipelineLayout Pipeline::create_pipeline_layout() const
 {
 	vk::PipelineLayoutCreateInfo pipeline_layout_info {
 		.setLayoutCount = 1,
@@ -54,16 +52,15 @@ vk::raii::PipelineLayout Pipeline::create_pipeline_layout(Device& device) const
 		.pushConstantRangeCount = 0
 	};
 
-	return vk::raii::PipelineLayout(device.logical(), pipeline_layout_info);
+	return vk::raii::PipelineLayout(Device::instance().logical(), pipeline_layout_info);
 }
 
 vk::raii::Pipeline Pipeline::create_graphics_pipeline(
 	ResourceManager& resource_manager,
-	Device& device,
 	Swapchain& swapchain
 ) const
 {
-	ResourceHandle<Shader> shader = get_shader(resource_manager, device);
+	ResourceHandle<Shader> shader = get_shader(resource_manager);
 	if (!shader) return nullptr;
 	std::vector<vk::PipelineShaderStageCreateInfo> shader_stages = get_shader_stages(shader);
 
@@ -77,13 +74,13 @@ vk::raii::Pipeline Pipeline::create_graphics_pipeline(
 	vk::PipelineInputAssemblyStateCreateInfo input_assembly = get_input_assembly();
 	vk::PipelineViewportStateCreateInfo viewport_state = get_viewport_state();
 	vk::PipelineRasterizationStateCreateInfo rasterizer = get_rasterizer();
-	vk::PipelineMultisampleStateCreateInfo multisampler = get_multisampler(device);
+	vk::PipelineMultisampleStateCreateInfo multisampler = get_multisampler();
 	vk::PipelineDepthStencilStateCreateInfo depth_stencil = get_depth_stencil();
 
 	vk::PipelineColorBlendAttachmentState color_blend_attachment = get_color_blend_attachment();
 	vk::PipelineColorBlendStateCreateInfo color_blend = get_color_blend(color_blend_attachment);
 
-	vk::PipelineRenderingCreateInfo pipeline_rendering_create_info = get_pipeline_rendering_create_info(device, swapchain);
+	vk::PipelineRenderingCreateInfo pipeline_rendering_create_info = get_pipeline_rendering_create_info(swapchain);
 
 	vk::GraphicsPipelineCreateInfo graphics_pipeline_create_info {
 		.stageCount = static_cast<u32>(shader_stages.size()),
@@ -109,20 +106,18 @@ vk::raii::Pipeline Pipeline::create_graphics_pipeline(
 	};
 
 	return vk::raii::Pipeline(
-		device.logical(),
+		Device::instance().logical(),
 		nullptr,
 		pipeline_create_info_chain.get<vk::GraphicsPipelineCreateInfo>()
 	);
 }
 
 ResourceHandle<Shader> Pipeline::get_shader(
-		ResourceManager& resource_manager,
-		Device& device
+		ResourceManager& resource_manager
 ) const
 {
 	return resource_manager.load<Shader>(
 		"shaders/slang.spv",
-		device,
 		vk::ShaderStageFlagBits::eAllGraphics
 	);
 }
@@ -210,10 +205,10 @@ vk::PipelineRasterizationStateCreateInfo Pipeline::get_rasterizer() const
 	};
 }
 
-vk::PipelineMultisampleStateCreateInfo Pipeline::get_multisampler(Device& device) const
+vk::PipelineMultisampleStateCreateInfo Pipeline::get_multisampler() const
 {
 	return {
-		.rasterizationSamples = device.msaa_sample_count(),
+		.rasterizationSamples = Device::instance().msaa_sample_count(),
 		.sampleShadingEnable = true, // PERF slow but better quality
 		.minSampleShading = 0.2f
 	};
@@ -261,14 +256,13 @@ vk::PipelineColorBlendStateCreateInfo Pipeline::get_color_blend(
 }
 
 vk::PipelineRenderingCreateInfo Pipeline::get_pipeline_rendering_create_info(
-	Device& device,
 	Swapchain& swapchain
 ) const
 {
 	return {
 		.colorAttachmentCount = 1,
 		.pColorAttachmentFormats = &swapchain.surface_format().format,
-		.depthAttachmentFormat = device.depth_format()
+		.depthAttachmentFormat = Device::instance().depth_format()
 	};
 }
 

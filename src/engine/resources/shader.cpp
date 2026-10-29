@@ -6,9 +6,8 @@ using namespace fluff::types;
 
 using namespace fluffy_fox;
 
-Shader::Shader(const std::string& id, Device& device, vk::ShaderStageFlagBits shader_stage) :
+Shader::Shader(const std::string& id, vk::ShaderStageFlagBits shader_stage) :
 	Resource(id),
-	device_(device),
 	shader_module_(nullptr),
 	stage_(shader_stage)
 {
@@ -30,7 +29,7 @@ bool Shader::do_load()
 		.pCode = reinterpret_cast<const u32*>(shader_code.data())
 	};
 
-	shader_module_ = vk::raii::ShaderModule(device_.logical(), create_info);
+	shader_module_ = vk::raii::ShaderModule(Device::instance().logical(), create_info);
 
 	return true;
 }

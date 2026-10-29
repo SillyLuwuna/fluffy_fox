@@ -3,7 +3,6 @@
 using namespace fluffy_fox::rendering;
 
 Image::Image(
-	Device& device,
 	u32 width,
 	u32 height,
 	u32 mip_levels,
@@ -14,13 +13,12 @@ Image::Image(
 	vk::MemoryPropertyFlags properties,
 	vk::ImageAspectFlags aspect
 ) :
-	image_(create_image(device, width, height, mip_levels, num_samples, format, tiling, usage)),
-	memory_(create_image_memory(device, properties)),
-	view_(create_view(device, format, aspect, mip_levels))
+	image_(create_image(width, height, mip_levels, num_samples, format, tiling, usage)),
+	memory_(create_image_memory(properties)),
+	view_(create_view(format, aspect, mip_levels))
 { }
 
 vk::raii::Image Image::create_image(
-	Device& device,
 	u32 width,
 	u32 height,
 	u32 mip_levels,
@@ -42,16 +40,15 @@ vk::raii::Image Image::create_image(
 		.sharingMode = vk::SharingMode::eExclusive
 	};
 
-	return vk::raii::Image(device.logical(), image_info);
+	return vk::raii::Image(Device::instance().logical(), image_info);
 }
 
 vk::raii::DeviceMemory Image::create_image_memory(
-	Device& device,
 	vk::MemoryPropertyFlags properties
 )
 {
 	vk::MemoryRequirements mem_requirements = image_.getMemoryRequirements();
-	u32 mem_type = find_memory_type(device, mem_requirements.memoryTypeBits, properties);
+	u32 mem_type = Device::instance().find_memory_type(mem_requirements.memoryTypeBits, properties);
 	if (mem_type == ~0u) return nullptr;
 
 	vk::MemoryAllocateInfo alloc_info = {
@@ -59,14 +56,13 @@ vk::raii::DeviceMemory Image::create_image_memory(
 		.memoryTypeIndex = mem_type
 	};
 
-	vk::raii::DeviceMemory image_memory = vk::raii::DeviceMemory(device.logical(), alloc_info);
+	vk::raii::DeviceMemory image_memory = vk::raii::DeviceMemory(Device::instance().logical(), alloc_info);
 	image_.bindMemory(image_memory, 0);
 
 	return std::move(image_memory);
 }
 
 vk::raii::ImageView Image::create_view(
-	Device& device,
 	vk::Format format,
 	vk::ImageAspectFlags aspect,
 	u32 mip_levels
@@ -91,24 +87,7 @@ vk::raii::ImageView Image::create_view(
 		}
 	};
 
-	return vk::raii::ImageView(device.logical(), view_info);
-}
-
-// returns ~0u when errored
-u32 Image::find_memory_type(Device& device, u32 type_filter, vk::MemoryPropertyFlags properties)
-{
-	// PERF selecting a specific heap "memoryHeaps" may increase performance
-	vk::PhysicalDeviceMemoryProperties mem_properties = device.physical().getMemoryProperties();
-
-	for (uint32_t i = 0; i < mem_properties.memoryTypeCount; i++)
-	{
-		if ((type_filter & (1 << i)) && (mem_properties.memoryTypes[i].propertyFlags & properties) == properties)
-		{
-			return i;
-		}
-	}
-
-	return ~0u;
+	return vk::raii::ImageView(Device::instance().logical(), view_info);
 }
 
 bool Image::is_valid() const

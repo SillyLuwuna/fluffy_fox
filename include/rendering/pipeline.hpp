@@ -20,20 +20,18 @@ namespace fluffy_fox::rendering
 		vk::raii::PipelineLayout pipeline_layout_;
 		vk::raii::Pipeline pipeline_;
 
-		vk::raii::DescriptorSetLayout create_descriptor_set_layout(Device& device) const;
+		vk::raii::DescriptorSetLayout create_descriptor_set_layout() const;
 		std::vector<vk::DescriptorSetLayoutBinding> get_descriptor_set_layout_bindings() const;
 
-		vk::raii::PipelineLayout create_pipeline_layout(Device& device) const;
+		vk::raii::PipelineLayout create_pipeline_layout() const;
 
 		vk::raii::Pipeline create_graphics_pipeline(
 			ResourceManager& resource_manager,
-			Device& device,
 			Swapchain& swapchain
 		) const;
 
 		ResourceHandle<Shader> get_shader(
-			ResourceManager& resource_manager,
-			Device& device
+			ResourceManager& resource_manager
 		) const;
 
 		std::vector<vk::PipelineShaderStageCreateInfo> get_shader_stages(
@@ -54,7 +52,7 @@ namespace fluffy_fox::rendering
 		vk::PipelineInputAssemblyStateCreateInfo get_input_assembly() const;
 		vk::PipelineViewportStateCreateInfo get_viewport_state() const;
 		vk::PipelineRasterizationStateCreateInfo get_rasterizer() const;
-		vk::PipelineMultisampleStateCreateInfo get_multisampler(Device& device) const;
+		vk::PipelineMultisampleStateCreateInfo get_multisampler() const;
 		vk::PipelineDepthStencilStateCreateInfo get_depth_stencil() const;
 		vk::PipelineColorBlendAttachmentState get_color_blend_attachment() const;
 
@@ -63,14 +61,12 @@ namespace fluffy_fox::rendering
 		) const;
 
 		vk::PipelineRenderingCreateInfo get_pipeline_rendering_create_info(
-			Device& device,
 			Swapchain& swapchain
 		) const;
 
 	public:
 		Pipeline(
 			ResourceManager& resource_manager,
-			Device& device,
 			Swapchain& swapchain
 		);
 

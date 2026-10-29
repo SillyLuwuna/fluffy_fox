@@ -15,7 +15,6 @@ namespace fluffy_fox
 	class Shader : public Resource
 	{
 	private:
-		Device& device_;
 		vk::raii::ShaderModule shader_module_;
 		vk::ShaderStageFlagBits stage_;
 
@@ -42,7 +41,7 @@ namespace fluffy_fox
 		void do_unload() override;
 
 	public:
-		explicit Shader(const std::string& id, Device& device, vk::ShaderStageFlagBits shader_stage);
+		explicit Shader(const std::string& id, vk::ShaderStageFlagBits shader_stage);
 		~Shader() override;
 
 		const vk::raii::ShaderModule& get_shader_module() const;

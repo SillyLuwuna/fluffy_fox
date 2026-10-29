@@ -6,12 +6,15 @@
 #include <fluff/types.hpp>
 using namespace fluff::types;
 
-
 namespace fluffy_fox::rendering
 {
+	class SingleTimeCommand;
+
 	class Device
 	{
 	private:
+		Device();
+
 		struct FeatureChain
 		{
 			vk::StructureChain<
@@ -47,6 +50,8 @@ namespace fluffy_fox::rendering
 		vk::raii::CommandPool graphics_command_pool_;
 		vk::Format depth_format_;
 
+		void init(vk::raii::Instance& instance, vk::SurfaceKHR surface);
+
 		static vk::raii::PhysicalDevice choose_physical_device(vk::raii::Instance& instance);
 		static bool is_physical_device_suitable(vk::raii::PhysicalDevice& device);
 		static bool supports_vulkan_version(vk::raii::PhysicalDevice& device, u32 version);
@@ -80,7 +85,18 @@ namespace fluffy_fox::rendering
 		) const;
 
 	public:
-		Device(vk::raii::Instance& instance, vk::SurfaceKHR surface);
+		Device(const Device&) = delete;
+		Device(Device&&) = delete;
+		Device& operator=(const Device&) = delete;
+		Device& operator=(Device&&) = delete;
+
+		static void create(vk::raii::Instance& instance, vk::SurfaceKHR surface);
+		inline static Device& instance()
+		{
+			static Device instance;
+
+			return instance;
+		}
 
 		inline vk::raii::PhysicalDevice& physical() { return physical_device_; } // TODO remove
 		inline vk::raii::Device& logical() { return device_; } // TODO remove
@@ -90,6 +106,7 @@ namespace fluffy_fox::rendering
 		inline vk::raii::Queue& present() { return present_.queue.value(); }
 		inline vk::raii::Queue& transfer() { return transfer_.queue.value(); }
 		inline vk::raii::Queue& compute() { return compute_.queue.value(); }
+		vk::raii::Queue& single_time_commands();
 
 		inline u32 graphics_family() const { return graphics_.family; }
 		inline u32 present_family() const { return present_.family; }
@@ -99,6 +116,9 @@ namespace fluffy_fox::rendering
 		inline vk::SampleCountFlagBits msaa_sample_count() const { return msaa_sample_count_; }
 		inline vk::raii::CommandPool& graphics_command_pool() { return graphics_command_pool_; }
 		inline vk::Format depth_format() const { return depth_format_; }
+		vk::raii::CommandPool& single_time_commands_command_pool();
 		// TODO others
+
+		u32 find_memory_type(u32 type_filter, vk::MemoryPropertyFlags properties);
 	};
 }

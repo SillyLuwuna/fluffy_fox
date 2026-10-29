@@ -1,12 +1,13 @@
 #include "engine/resources/mesh.hpp"
 
+#include "rendering/vertex.hpp"
+#include <iostream>
+
 using namespace fluffy_fox;
 
 
 Mesh::Mesh(const std::string& id) :
-	Resource(id),
-	vertex_count_(0),
-	index_count_(0)
+	Resource(id)
 { }
 
 Mesh::~Mesh()
@@ -16,12 +17,19 @@ Mesh::~Mesh()
 
 bool Mesh::do_load()
 {
-	// TODO
-	// load file
-	// load mesh
-	// transform data into vulkan resources
-	// cleanup cpu resources
-	throw std::runtime_error("not implemented");
+	GltfReader gltf_reader;
+	if (!gltf_reader.load(get_id())) return false;
+
+	const tg3_model& model = *gltf_reader.model().get();
+
+	for (u32 mesh_idx = 0; mesh_idx < model.meshes_count; mesh_idx++)
+	{
+		const tg3_mesh& mesh = model.meshes[mesh_idx];
+		for (u32 primitive_idx = 0; primitive_idx < mesh.primitives_count; primitive_idx++)
+		{
+			Primitive primitive = 
+		}
+	}
 }
 
 
@@ -35,22 +43,13 @@ void Mesh::do_unload()
 	throw std::runtime_error("not implemented");
 }
 
-vk::Buffer Mesh::get_vertex_buffer() const
+void Mesh::print_error(tinygltf3::ErrorStack& errors)
 {
-	return vertex_buffer_;
-}
-
-vk::Buffer Mesh::get_index_buffer() const
-{
-	return index_buffer_;
-}
-
-u32 Mesh::get_vertex_count() const
-{
-	return vertex_count_;
-}
-
-u32 Mesh::get_index_count() const
-{
-	return index_count_;
+	std::string error;
+	for (uint32_t i = 0; i < errors.count(); i++)
+	{
+		error += "[" + std::to_string((int)errors.entry(i)->severity) + "] ";
+		error += errors.entry(i)->message ? errors.entry(i)->message : "(null)";
+	}
+	std::cout << error << "\n";
 }

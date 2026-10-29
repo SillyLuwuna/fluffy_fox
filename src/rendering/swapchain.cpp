@@ -4,19 +4,19 @@
 
 using namespace fluffy_fox::rendering;
 
-Swapchain::Swapchain(Device& device, const Window& window) :
-	extent_(choose_extent(device, window)),
-	surface_format_(choose_surface_format(device, window)),
-	swapchain_(create_swapchain(device, window)),
+Swapchain::Swapchain(const Window& window) :
+	extent_(choose_extent(window)),
+	surface_format_(choose_surface_format(window)),
+	swapchain_(create_swapchain(window)),
 	images_(swapchain_.getImages()),
-	image_views_(create_image_views(device)),
-	color_(create_color_image(device)),
-	depth_(create_depth_image(device))
+	image_views_(create_image_views()),
+	color_(create_color_image()),
+	depth_(create_depth_image())
 { }
 
-vk::Extent2D Swapchain::choose_extent(Device& device, const Window& window)
+vk::Extent2D Swapchain::choose_extent(const Window& window)
 {
-	vk::SurfaceCapabilitiesKHR capabilities = device.physical().getSurfaceCapabilitiesKHR(*window.surface());
+	vk::SurfaceCapabilitiesKHR capabilities = Device::instance().physical().getSurfaceCapabilitiesKHR(*window.surface());
 	if (capabilities.currentExtent.width != std::numeric_limits<u32>::max())
 	{
 		// if not allowed to specify resolution
@@ -31,9 +31,9 @@ vk::Extent2D Swapchain::choose_extent(Device& device, const Window& window)
 	};
 }
 
-vk::SurfaceFormatKHR Swapchain::choose_surface_format(Device& device, const Window& window)
+vk::SurfaceFormatKHR Swapchain::choose_surface_format(const Window& window)
 {
-	std::vector<vk::SurfaceFormatKHR> available_formats = device.physical().getSurfaceFormatsKHR(*window.surface());
+	std::vector<vk::SurfaceFormatKHR> available_formats = Device::instance().physical().getSurfaceFormatsKHR(*window.surface());
 
 	for (u64 i = 0; i < available_formats.size(); i++)
 	{
@@ -50,9 +50,9 @@ vk::SurfaceFormatKHR Swapchain::choose_surface_format(Device& device, const Wind
 	return available_formats[0]; // fallback
 }
 
-vk::PresentModeKHR Swapchain::choose_present_mode(Device& device, const Window& window)
+vk::PresentModeKHR Swapchain::choose_present_mode(const Window& window)
 {
-	std::vector<vk::PresentModeKHR> available_present_modes = device.physical().getSurfacePresentModesKHR(*window.surface());
+	std::vector<vk::PresentModeKHR> available_present_modes = Device::instance().physical().getSurfacePresentModesKHR(*window.surface());
 
 	vk::PresentModeKHR best_present_mode = vk::PresentModeKHR::eFifo;
 
@@ -74,9 +74,9 @@ vk::PresentModeKHR Swapchain::choose_present_mode(Device& device, const Window& 
 	return best_present_mode;
 }
 
-u32 Swapchain::choose_min_image_count(Device& device, const Window& window)
+u32 Swapchain::choose_min_image_count(const Window& window)
 {
-	vk::SurfaceCapabilitiesKHR surface_capabilities = device.physical().getSurfaceCapabilitiesKHR(*window.surface());
+	vk::SurfaceCapabilitiesKHR surface_capabilities = Device::instance().physical().getSurfaceCapabilitiesKHR(*window.surface());
 
 	u32 min_image_count = std::max(3u, surface_capabilities.minImageCount);
 	if ((0 < surface_capabilities.maxImageCount) && (surface_capabilities.maxImageCount < min_image_count))
@@ -87,11 +87,11 @@ u32 Swapchain::choose_min_image_count(Device& device, const Window& window)
 	return min_image_count;
 }
 
-vk::raii::SwapchainKHR Swapchain::create_swapchain(Device& device, const Window& window)
+vk::raii::SwapchainKHR Swapchain::create_swapchain(const Window& window)
 {
-	vk::SurfaceCapabilitiesKHR surface_capabilities = device.physical().getSurfaceCapabilitiesKHR(*window.surface());
-	u32 min_image_count = choose_min_image_count(device, window);
-	vk::PresentModeKHR present_mode = choose_present_mode(device, window);
+	vk::SurfaceCapabilitiesKHR surface_capabilities = Device::instance().physical().getSurfaceCapabilitiesKHR(*window.surface());
+	u32 min_image_count = choose_min_image_count(window);
+	vk::PresentModeKHR present_mode = choose_present_mode(window);
 
 	vk::SwapchainCreateInfoKHR swapchain_create_info {
 		.surface = *window.surface(),
@@ -108,10 +108,10 @@ vk::raii::SwapchainKHR Swapchain::create_swapchain(Device& device, const Window&
 		.clipped = true,
 	};
 
-	return vk::raii::SwapchainKHR(device.logical(), swapchain_create_info);
+	return vk::raii::SwapchainKHR(Device::instance().logical(), swapchain_create_info);
 }
 
-std::vector<vk::raii::ImageView> Swapchain::create_image_views(Device& device)
+std::vector<vk::raii::ImageView> Swapchain::create_image_views()
 {
 	std::vector<vk::raii::ImageView> image_views;
 
@@ -120,7 +120,6 @@ std::vector<vk::raii::ImageView> Swapchain::create_image_views(Device& device)
 	for (vk::Image& image : images_)
 	{
 		image_views.emplace_back(vulkan_image::create_image_view(
-			device,
 			image,
 			surface_format_.format,
 			vk::ImageAspectFlagBits::eColor,
@@ -131,28 +130,27 @@ std::vector<vk::raii::ImageView> Swapchain::create_image_views(Device& device)
 	return image_views;
 }
 
-void Swapchain::recreate(Device& device, const Window& window)
+void Swapchain::recreate(const Window& window)
 {
 	image_views_.clear();
 	swapchain_ = nullptr;
 
-	extent_ = choose_extent(device, window);
-	surface_format_ = choose_surface_format(device, window);
-	swapchain_ = create_swapchain(device, window);
+	extent_ = choose_extent(window);
+	surface_format_ = choose_surface_format(window);
+	swapchain_ = create_swapchain(window);
 	images_ = swapchain_.getImages();
-	image_views_ = create_image_views(device);
-	color_ = create_color_image(device);
-	depth_ = create_depth_image(device);
+	image_views_ = create_image_views();
+	color_ = create_color_image();
+	depth_ = create_depth_image();
 }
 
-Image Swapchain::create_color_image(Device& device) const
+Image Swapchain::create_color_image() const
 {
 	return Image(
-		device,
 		extent_.width,
 		extent_.height,
 		1,
-		device.msaa_sample_count(),
+		Device::instance().msaa_sample_count(),
 		surface_format_.format,
 		vk::ImageTiling::eOptimal,
 		vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eColorAttachment,
@@ -161,15 +159,14 @@ Image Swapchain::create_color_image(Device& device) const
 	);
 }
 
-Image Swapchain::create_depth_image(Device& device) const
+Image Swapchain::create_depth_image() const
 {
 	return Image(
-		device,
 		extent_.width,
 		extent_.height,
 		1,
-		device.msaa_sample_count(),
-		device.depth_format(),
+		Device::instance().msaa_sample_count(),
+		Device::instance().depth_format(),
 		vk::ImageTiling::eOptimal,
 		vk::ImageUsageFlagBits::eDepthStencilAttachment,
 		vk::MemoryPropertyFlagBits::eDeviceLocal,

@@ -3,7 +3,6 @@
 using namespace fluffy_fox::rendering;
 
 vk::raii::ImageView vulkan_image::create_image_view(
-	Device& device,
 	const vk::Image& image,
 	vk::Format format,
 	vk::ImageAspectFlags aspect_flags,
@@ -29,5 +28,5 @@ vk::raii::ImageView vulkan_image::create_image_view(
 		}
 	};
 
-	return vk::raii::ImageView(device.logical(), viewInfo);
+	return vk::raii::ImageView(Device::instance().logical(), viewInfo);
 }

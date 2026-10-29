@@ -114,7 +114,6 @@ namespace fluffy_fox::rendering
 		vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
 
 		std::unique_ptr<ResourceManager> resource_manager;
-		std::unique_ptr<Device> device;
 		vk::raii::SurfaceKHR surface = nullptr; // FIXME
 		std::unique_ptr<Swapchain> swapchain;
 		std::unique_ptr<Pipeline> pipeline;
@@ -330,7 +329,7 @@ namespace fluffy_fox::rendering
 		{
 			// PERF usually done once and stored. Not generated each time.
 
-			vk::FormatProperties formatProperties = device->physical().getFormatProperties(imageFormat);
+			vk::FormatProperties formatProperties = Device::instance().physical().getFormatProperties(imageFormat);
 			if (!(formatProperties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear))
 			{
 				throw std::runtime_error("texture image format does not support linear blitting!");
@@ -1608,12 +1607,17 @@ namespace fluffy_fox::rendering
 			createInstance();
 			setupDebugMessenger();
 
+			// FIXME the vulkan instance should be the singleton
+			// Device shouldn't be a singleton, it should be
+			// accessed through something like Instance::instance().device()
+			// either that or make Device hold the instance
+
 			resource_manager = std::make_unique<ResourceManager>();
 
 			// TODO make an overarching base class for render components, which has is_valid() method
 			if (!window.create_surface(instance)) { throw std::runtime_error("failed to create window surface!"); }
 
-			device = std::make_unique<Device>(instance, *window.surface());
+			Device::create(instance, *window.surface());
 			if (!device->is_valid()) { throw std::runtime_error("failed to create device!"); }
 
 			swapchain = std::make_unique<Swapchain>(*device, window);
@@ -1633,6 +1637,8 @@ namespace fluffy_fox::rendering
 			createDescriptorSets();
 			createCommandBuffers();
 			createSyncObjects();
+
+			// FIXME make exports unified in a single file
 		}
 
 		~VulkanTutorial()

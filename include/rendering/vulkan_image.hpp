@@ -10,8 +10,8 @@ using namespace fluff::types;
 
 namespace fluffy_fox::rendering::vulkan_image
 {
+	// FIXME put in the actual Image class
 	vk::raii::ImageView create_image_view(
-		Device& device,
 		const vk::Image& image,
 		vk::Format format,
 		vk::ImageAspectFlags aspect_flags,

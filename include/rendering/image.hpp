@@ -18,7 +18,6 @@ namespace fluffy_fox::rendering
 		vk::raii::ImageView view_;
 
 		vk::raii::Image create_image(
-			Device& device,
 			u32 width,
 			u32 height,
 			u32 mip_levels,
@@ -29,22 +28,17 @@ namespace fluffy_fox::rendering
 		);
 
 		vk::raii::DeviceMemory create_image_memory(
-			Device& device,
 			vk::MemoryPropertyFlags properties
 		);
 
 		vk::raii::ImageView create_view(
-			Device& device,
 			vk::Format format,
 			vk::ImageAspectFlags aspect,
 			u32 mip_levels
 		);
 
-		u32 find_memory_type(Device& device, u32 type_filter, vk::MemoryPropertyFlags properties);
-
 	public:
 		Image(
-			Device& device,
 			u32 width,
 			u32 height,
 			u32 mip_levels,

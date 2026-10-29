@@ -1,21 +1,25 @@
 #include "rendering/device.hpp"
 
 using namespace fluffy_fox::rendering;
+Device::Device() :
+	physical_device_(nullptr),
+	device_(nullptr),
+	msaa_sample_count_(vk::SampleCountFlagBits::e1),
+	graphics_command_pool_(nullptr)
+{ }
 
-Device::Device(vk::raii::Instance& instance, vk::SurfaceKHR surface) :
-	physical_device_(choose_physical_device(instance)),
-	device_(create_logical_device(physical_device_, surface)),
-	msaa_sample_count_(get_max_usable_msaa_sample_count()),
-	graphics_command_pool_(create_command_pool(graphics_family())),
-	depth_format_(find_depth_format())
-	// TODO error handling, what if both of these end up being nullptr? how should other
-	// classes know and deal with it?
+void Device::create(vk::raii::Instance& instance, vk::SurfaceKHR surface)
 {
+	Device::instance().init(instance, surface);
+}
 
-	init_queue(graphics_, device_);
-	// init_queue(present_, device_);
-	// init_queue(transfer_, device_);
-	// init_queue(compute_, device_);
+void Device::init(vk::raii::Instance& instance, vk::SurfaceKHR surface)
+{
+	physical_device_ = choose_physical_device(instance);
+	device_ = create_logical_device(physical_device_, surface);
+	msaa_sample_count_ = get_max_usable_msaa_sample_count();
+	graphics_command_pool_ = create_command_pool(graphics_family());
+	depth_format_ = find_depth_format();
 
 	// TODO mix command pools, make this abstract.
 	// different families might have the same index,
@@ -459,4 +463,33 @@ vk::Format Device::find_supported_format(
 
 	// FIXME remove exception
 	throw std::runtime_error("failed to find supported format!");
+}
+
+// returns ~0u when errored
+u32 Device::find_memory_type(u32 type_filter, vk::MemoryPropertyFlags properties)
+{
+	// PERF selecting a specific heap "memoryHeaps" may increase performance
+	vk::PhysicalDeviceMemoryProperties mem_properties = physical_device_.getMemoryProperties();
+
+	for (uint32_t i = 0; i < mem_properties.memoryTypeCount; i++)
+	{
+		if ((type_filter & (1 << i)) && (mem_properties.memoryTypes[i].propertyFlags & properties) == properties)
+		{
+			return i;
+		}
+	}
+
+	return ~0u;
+}
+
+vk::raii::CommandPool& Device::single_time_commands_command_pool()
+{
+	// TODO develop
+	return graphics_command_pool_;
+}
+
+vk::raii::Queue& Device::single_time_commands()
+{
+	// TODO develop
+	return graphics();
 }

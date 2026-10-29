@@ -24,6 +24,7 @@ namespace fluffy_fox::rendering
 
 		bool operator==(const Vertex& other) const
 		{
+			// change to memcmp?
 			return
 				pos == other.pos &&
 				color == other.color &&

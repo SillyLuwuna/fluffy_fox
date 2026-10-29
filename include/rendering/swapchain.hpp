@@ -24,17 +24,17 @@ namespace fluffy_fox::rendering
 		Image color_;
 		Image depth_;
 
-		static vk::Extent2D choose_extent(Device& device, const Window& window);
-		static vk::SurfaceFormatKHR choose_surface_format(Device& device, const Window& window);
-		static vk::PresentModeKHR choose_present_mode(Device& device, const Window& window);
-		static u32 choose_min_image_count(Device& device, const Window& window);
-		vk::raii::SwapchainKHR create_swapchain(Device& device, const Window& window);
-		std::vector<vk::raii::ImageView> create_image_views(Device& device);
-		Image create_color_image(Device& device) const;
-		Image create_depth_image(Device& device) const;
+		static vk::Extent2D choose_extent(const Window& window);
+		static vk::SurfaceFormatKHR choose_surface_format(const Window& window);
+		static vk::PresentModeKHR choose_present_mode(const Window& window);
+		static u32 choose_min_image_count(const Window& window);
+		vk::raii::SwapchainKHR create_swapchain(const Window& window);
+		std::vector<vk::raii::ImageView> create_image_views();
+		Image create_color_image() const;
+		Image create_depth_image() const;
 
 	public:
-		Swapchain(Device& device, const Window& window);
+		Swapchain(const Window& window);
 
 		inline vk::Extent2D& extent() { return extent_; }
 		inline vk::SurfaceFormatKHR& surface_format() { return surface_format_; }
@@ -42,7 +42,7 @@ namespace fluffy_fox::rendering
 		inline std::vector<vk::Image>& images() { return images_; }
 		inline std::vector<vk::raii::ImageView>& image_views() { return image_views_; }
 
-		void recreate(Device& device, const Window& window);
+		void recreate(const Window& window);
 		bool is_valid() const;
 
 		inline Image& color() { return color_; }
