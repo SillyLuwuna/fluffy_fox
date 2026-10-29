@@ -46,6 +46,7 @@ namespace fluffy_fox
 
 		const tg3_image* get_texture_image(const tg3_model& model, const tg3_primitive& primitive);
 		bool decode_image(const tg3_model& model, const tg3_image& image);
+		u32 get_mip_levels(i32 width, i32 height) const;
 
 	public:
 		explicit Texture(const std::string& id, const std::string& base_dir, ResourceHandle<GltfFile> gltf_file, u32 mesh_idx, u32 primitive_idx);

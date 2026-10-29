@@ -10,6 +10,10 @@ using namespace fluff::types;
 
 namespace fluffy_fox::rendering
 {
+	// TODO
+	// - make an "upload" function
+	// - make upload function be asynchronous
+	// - use VMA instead of directly allocating
 	class Buffer
 	{
 	private:
@@ -51,7 +55,7 @@ namespace fluffy_fox::rendering
 			);
 
 			buffer.bindMemory(*buffer_memory, 0); // second parameter is the offset within the region of memory
-			return std::move(buffer_memory);
+			return buffer_memory;
 		}
 
 		void copy_buffer_command(

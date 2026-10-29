@@ -39,9 +39,15 @@ bool Texture::do_load()
 
 	if (!decode_image(model, *image)) return false;
 
+	mip_levels_ = get_mip_levels(width_, height_);
 	// FIXME image_, memory_, image_view_ and sampler_ from VulkanTutorial::createTextureImage()
 
 	return true;
+}
+
+u32 Texture::get_mip_levels(i32 width, i32 height) const
+{
+	return static_cast<u32>(std::floor(std::log2(std::max(width, height)))) + 1;
 }
 
 void Texture::do_unload()
