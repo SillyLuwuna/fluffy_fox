@@ -5,6 +5,7 @@
 #include "rendering/device.hpp"
 #include "rendering/image.hpp"
 #include "rendering/single_time_command.hpp"
+#include <iostream>
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan_raii.hpp>
 
@@ -59,6 +60,8 @@ namespace fluffy_fox::rendering
 
 			vk::MemoryRequirements mem_requirements = buffer.getMemoryRequirements();
 			vk::raii::DeviceMemory device_memory = alloc(mem_requirements, properties);
+
+			buffer.bindMemory(device_memory, 0); // second parameter is the offset within the region of memory
 
 			return {
 				.buffer = std::move(buffer),
@@ -129,7 +132,7 @@ namespace fluffy_fox::rendering
 		}
 
 		template <typename T>
-		static GpuBuffer upload(const std::vector<T> arr, vk::BufferUsageFlags usage)
+		static GpuBuffer upload(const std::vector<T>& arr, vk::BufferUsageFlags usage)
 		{
 			vk::DeviceSize buffer_size = sizeof(T) * arr.size();
 
@@ -156,6 +159,7 @@ namespace fluffy_fox::rendering
 
 			SingleTimeCommand single_time_command;
 			single_time_command.copy_buffer(dst_buffer, staging_buffer, buffer_size);
+			single_time_command.end();
 
 			return dst_buffer;
 		}
@@ -187,7 +191,9 @@ namespace fluffy_fox::rendering
 				vk::ImageLayout::eTransferDstOptimal
 			);
 			command.copy_buffer_to_image(staging, gpu_image);
+			// FIXME (this isn't obvious) transitioned to eShaderReadOnlyOptimal while generating mipmaps
 			command.generate_mipmaps(gpu_image);
+			command.end();
 
 			return gpu_image;
 		}

@@ -43,5 +43,7 @@ namespace fluffy_fox::rendering
 		);
 
 		void generate_mipmaps(GpuImage& image);
+
+		void end(); // FIXME remove
 	};
 }

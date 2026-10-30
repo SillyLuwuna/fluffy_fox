@@ -15,7 +15,7 @@ using namespace fluffy_fox;
 // { }
 
 Geometry::Geometry(GltfFile& gltf_file, const tg3_primitive& primitive) :
-	vertex_buffer_(GpuBuffer::empty()),
+	// vertex_buffer_(GpuBuffer::empty()),
 	vertex_count_(0),
 	index_buffer_(GpuBuffer::empty()),
 	index_count_(0),
@@ -23,7 +23,8 @@ Geometry::Geometry(GltfFile& gltf_file, const tg3_primitive& primitive) :
 { }
 
 Geometry::Geometry(Geometry&& other) :
-	vertex_buffer_(std::move(other.vertex_buffer_)),
+	vertices_(std::move(other.vertices_)),
+	// vertex_buffer_(std::move(other.vertex_buffer_)),
 	vertex_count_(other.vertex_count_),
 	index_buffer_(std::move(other.index_buffer_)),
 	index_count_(other.index_count_),
@@ -32,7 +33,7 @@ Geometry::Geometry(Geometry&& other) :
 
 Geometry::~Geometry()
 {
-	vertex_buffer_ = nullptr;
+	// vertex_buffer_ = nullptr;
 	index_buffer_ = nullptr;
 	vertex_count_ = 0;
 	index_count_ = 0;
@@ -42,14 +43,14 @@ bool Geometry::load(GltfFile& gltf_file, const tg3_primitive& primitive)
 {
 	assert(primitive.mode == TG3_MODE_TRIANGLES || primitive.mode == -1);
 
-	std::vector<glm::vec3> vertices;
+	// std::vector<glm::vec3> vertices;
 	std::vector<u32> indices;
-	if (!load_primitive(gltf_file, primitive, vertices, indices)) return false;
+	if (!load_primitive(gltf_file, primitive, vertices_, indices)) return false;
 
-	vertex_buffer_ = Gpu::upload<glm::vec3>(vertices, vk::BufferUsageFlagBits::eVertexBuffer);
-	vertex_count_ = vertices.size();
+	// vertex_buffer_ = Gpu::upload(vertices, vk::BufferUsageFlagBits::eVertexBuffer);
+	vertex_count_ = vertices_.size();
 
-	index_buffer_ = Gpu::upload<u32>(indices, vk::BufferUsageFlagBits::eIndexBuffer);
+	index_buffer_ = Gpu::upload(indices, vk::BufferUsageFlagBits::eIndexBuffer);
 	index_count_ = indices.size();
 
 	return true;
@@ -76,8 +77,8 @@ bool Geometry::load_primitive(
 	if (!add_vertices(gltf_file, primitive, positions, vertices, indices)) return false;
 
 	std::cout << "loaded primitive\n";
-	std::cout << "\tvertices: " << std::to_string(indices.size()) << "\n";
-	std::cout << "\tindices:  " << std::to_string(vertices.size()) << "\n";
+	std::cout << "\tvertices: " << std::to_string(vertices.size()) << "\n";
+	std::cout << "\tindices:  " << std::to_string(indices.size()) << "\n";
 
 	return true;
 }
@@ -128,7 +129,7 @@ bool Geometry::add_vertices(
 
 	if (has_indices)
 	{
-		load_vertices(gltf_file, primitive, vertices, indices);
+		if (!load_vertices(gltf_file, primitive, vertices, indices)) return false;
 	}
 
 	return true;
@@ -141,15 +142,16 @@ bool Geometry::load_vertices(
 	std::vector<u32>& indices
 )
 {
-	const u32 base = (u32)vertices.size();
+	// const u32 base = (u32)vertices.size();
 
 	i32 idx_num_components;
 	std::vector<u32> idx;
 	if (!gltf_file.read_accessor<u32>(primitive.indices, idx, idx_num_components)) return false;
 
-	for (uint32_t i : idx)
+	for (u32 i : idx)
 	{
-		indices.push_back(base + i);
+		// indices.push_back(base + i);
+		indices.push_back(i);
 	}
 
 	return true;

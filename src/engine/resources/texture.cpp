@@ -34,20 +34,51 @@ bool Texture::do_load()
 	if (!decode_image(model, *image, image_)) return false;
 
 	mip_levels_ = get_mip_levels(image_.width, image_.height);
-
-	gpu_image_ = Gpu::create_image(
-		image_.width,
-		image_.height,
-		mip_levels_,
-		vk::SampleCountFlagBits::e1,
-		vk::Format::eR8G8B8A8Srgb,
-		vk::ImageTiling::eOptimal,
-		vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
-		vk::ImageAspectFlagBits::eColor,
-		vk::MemoryPropertyFlagBits::eDeviceLocal
-	);
-
+	if (!load_uvs(*gltf_file_, primitive, uvs_)) return false;
+	gpu_image_ = Gpu::upload_image(image_, mip_levels_);
 	sampler_ = create_sampler();
+
+	return true;
+}
+
+bool Texture::load_uvs(
+	GltfFile& gltf_file,
+	const tg3_primitive& primitive,
+	std::vector<glm::vec2>& out_uvs
+)
+{
+	i32 uv_accessor = gltf_file.find_attribute(primitive, "TEXCOORD_0");
+	if (uv_accessor < 0) return false;
+
+	std::vector<f32> uv_data;
+	i32 num_components = 0;
+
+	if (!gltf_file.read_accessor<f32>(uv_accessor, uv_data, num_components) ||
+		num_components != 2
+	) return false;
+
+	if (!add_uvs(gltf_file, primitive, uv_data, out_uvs)) return false;
+
+	return true;
+}
+
+bool Texture::add_uvs(
+	GltfFile& gltf_file,
+	const tg3_primitive& primitive,
+	const std::vector<f32>& uv_data,
+	std::vector<glm::vec2>& out_uvs
+)
+{
+	const u64 uv_count = uv_data.size() / 2;
+	out_uvs.reserve(uv_count);
+
+	for (u64 i = 0; i < uv_count; i++)
+	{
+		glm::vec2 uv;
+		memcpy(&uv, &uv_data[i * 2], 2 * sizeof(f32));
+
+		out_uvs.push_back(uv);
+	}
 
 	return true;
 }

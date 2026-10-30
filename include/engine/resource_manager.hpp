@@ -68,6 +68,11 @@ namespace fluffy_fox
 		friend class ResourceHandle;
 
 	public:
+		~ResourceManager()
+		{
+			unload_all();
+		}
+
 		template <typename T, typename... Args>
 		ResourceHandle<T> load(const std::string& resource_id, Args&&... args);
 

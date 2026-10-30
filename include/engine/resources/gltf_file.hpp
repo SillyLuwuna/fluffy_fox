@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan_raii.hpp>
 #include <tiny_gltf_v3.h>
@@ -168,7 +169,7 @@ public:
 	bool read_accessor(
 		i32 accessor_idx,
 		std::vector<T>& out,
-		int& out_num_components
+		i32& out_num_components
 	)
 	{
 		assert_accessor_type<T>();
@@ -182,7 +183,7 @@ public:
 		out.assign((u64)accessor.count * component_size, 0.0f);
 		const bool is_accessor_normalized = accessor.normalized != 0;
 
-		if (accessor.buffer_view <= 0) return false;
+		if (accessor.buffer_view < 0) return false;
 		read_accessor_buffer<T>(out, accessor, component_size, out_num_components, is_accessor_normalized);
 
 		return true;

@@ -2,6 +2,7 @@
 
 #include "engine/resources/geometry.hpp"
 #include "engine/resources/texture.hpp"
+#include "rendering/vertex.hpp"
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan_raii.hpp>
 #include <tiny_gltf_v3.h>
@@ -35,8 +36,10 @@ namespace fluffy_fox
 		u32 mesh_idx_;
 		std::vector<Geometry> geometry_;
 		std::vector<ResourceHandle<Texture>> textures_;
+		std::vector<GpuBuffer> vertex_buffers_;
 	
 		void print_error(tinygltf3::ErrorStack& errors);
+		std::vector<Vertex> get_vertex_data(const Geometry& geometry, const Texture& texture);
 
 	protected:
 		bool do_load() override;
@@ -54,6 +57,7 @@ namespace fluffy_fox
 
 		inline const std::vector<Geometry>& geometry() const { return geometry_; }
 		inline const std::vector<ResourceHandle<Texture>>& textures() const { return textures_; }
+		inline const std::vector<GpuBuffer>& vertex_buffers() const { return vertex_buffers_; }
 	};
 }
 

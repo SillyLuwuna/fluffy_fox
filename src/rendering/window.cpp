@@ -23,6 +23,7 @@ Window::Window(const std::string& name, i32 width, i32 height) :
 	// 	throw std::runtime_error("glfx does not support multiple instantiations, limiting to one window");
 	// }
 
+	glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11); // FIXME remove this line
 	if (!glfwInit())
 	{
 		spdlog::critical("could not initialize glfw");

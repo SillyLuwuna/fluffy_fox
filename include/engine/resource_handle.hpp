@@ -30,12 +30,15 @@ namespace fluffy_fox
 		ResourceHandle(ResourceHandle&& other) :
 			resource_id_(std::move(other.resource_id_)),
 			resource_manager_(other.resource_manager_)
-		{ }
+		{
+			other.resource_manager_ = nullptr;
+		}
 
 		ResourceHandle& operator=(ResourceHandle&& other)
 		{
 			resource_id_ = std::move(other.resource_id_);
 			resource_manager_ = other.resource_manager_;
+			other.resource_manager_ = nullptr;
 			return *this;
 		}
 
@@ -117,6 +120,7 @@ namespace fluffy_fox
 		if (!resource_manager_) return *this;
 
 		resource_manager_->release<T>(resource_id_);
+		resource_manager_ = nullptr;
 
 		return *this;
 	}

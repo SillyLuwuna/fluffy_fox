@@ -170,6 +170,12 @@ vk::raii::Device Device::create_logical_device(vk::raii::PhysicalDevice& physica
 
 	vk::raii::Device device = vk::raii::Device(physical_device, device_create_info);
 
+	init_queue(graphics_, device);
+	// FIXME
+	// init_queue(compute_, device);
+	// init_queue(present_, device);
+	// init_queue(transfer_, device);
+
 	return std::move(device);
 }
 
@@ -306,9 +312,9 @@ std::vector<vk::DeviceQueueCreateInfo> Device::get_queue_create_infos(vk::Surfac
 	// FIXME check if the queues are actually the same family.
 	// if they are, don't create so many queues.
 	create_graphics_queues(device_create_infos, surface);
-	create_present_queues(device_create_infos, surface);
-	create_transfer_queues(device_create_infos);
-	create_compute_queues(device_create_infos);
+	// create_present_queues(device_create_infos, surface);
+	// create_transfer_queues(device_create_infos);
+	// create_compute_queues(device_create_infos);
 
 	return device_create_infos;
 }

@@ -25,7 +25,8 @@ namespace fluffy_fox
 	class Geometry
 	{
 	private:
-		GpuBuffer vertex_buffer_;
+		// GpuBuffer vertex_buffer_;
+		std::vector<glm::vec3> vertices_;
 		u32 vertex_count_;
 
 		GpuBuffer index_buffer_;
@@ -63,7 +64,8 @@ namespace fluffy_fox
 		~Geometry();
 
 		inline bool is_valid() const { return is_valid_; }
-		inline const vk::Buffer vertex_buffer() const { return vertex_buffer_.buffer; }
+		// inline const vk::Buffer vertex_buffer() const { return vertex_buffer_.buffer; }
+		inline const std::vector<glm::vec3>& vertices() const { return vertices_; }
 		inline const vk::Buffer index_buffer() const { return index_buffer_.buffer; }
 		inline u32 vertex_count() const { return vertex_count_; }
 		inline u32 index_count() const { return index_count_; }

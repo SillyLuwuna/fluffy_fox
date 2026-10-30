@@ -36,7 +36,6 @@ namespace fluffy_fox::rendering
 	const std::string MODEL_PATH = "models/source/kiu_1015162433_texture.glb";
 	// const std::string MODEL_PATH = "models/lowpoly_fox.glb";
 	// const std::string MODEL_PATH = "models/shiba.glb";
-	const std::string TEXTURE_PATH = "textures/viking_room.png";
 	const bool USE_MODEL_TEXTURE = true;
 
 	constexpr int MAX_OBJECTS = 3;
@@ -103,7 +102,6 @@ namespace fluffy_fox::rendering
 		std::unique_ptr<Swapchain> swapchain;
 		std::unique_ptr<Pipeline> pipeline;
 		ResourceHandle<Mesh> mesh;
-		ResourceHandle<Texture> texture;
 
 		vk::raii::DescriptorPool descriptorPool = nullptr;
 
@@ -472,11 +470,10 @@ namespace fluffy_fox::rendering
 				.pDepthAttachment = &depthAttachmentInfo
 			};
 
-			// TODO needs synchronization here?
 			commandBuffer.beginRendering(renderingInfo);
 			commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline->pipeline());
 
-			commandBuffer.bindVertexBuffers(0, mesh->geometry()[0].vertex_buffer(), {0}); // FIXME only for primitive 0
+			commandBuffer.bindVertexBuffers(0, *mesh->vertex_buffers()[0].buffer, {0}); // FIXME only for primitive 0
 			commandBuffer.bindIndexBuffer(mesh->geometry()[0].index_buffer(), 0, vk::IndexTypeValue<u32>::value); // FIXME only for primitive 0
 
 			vk::Viewport viewport {
@@ -512,7 +509,7 @@ namespace fluffy_fox::rendering
 			}
 
 			commandBuffer.endRendering();
-			// TODO needs synchronization here?
+
 
 			transition_image_layout(
 				commandBuffer,
@@ -717,6 +714,7 @@ namespace fluffy_fox::rendering
 	public:
 		VulkanTutorial(Window& window) : window(window)
 		{
+			// FIXME load time
 			setWindowSettings();
 			createInstance();
 			setupDebugMessenger();
@@ -742,6 +740,7 @@ namespace fluffy_fox::rendering
 
 			ResourceHandle<GltfFile> gltf_file = resource_manager->load<GltfFile>(MODEL_PATH);
 			mesh = resource_manager->load<Mesh>(MODEL_PATH, *resource_manager, std::move(gltf_file), 0); // FIXME only mesh 0
+			if (!mesh) { throw std::runtime_error("failed to load mesh!"); } // FIXME if this errors where it was erroring, the program freaks out
 
 			setupGameObjects();
 			createUniformBuffers();
@@ -772,6 +771,13 @@ namespace fluffy_fox::rendering
 			}
 
 			surface = window.take_surface(); // FIXME
+
+			// FIXME
+			mesh = nullptr;
+			pipeline = nullptr;
+			swapchain = nullptr;
+			resource_manager = nullptr;
+			std::cout << "here\n";
 
 			// window.destroy_surface();
 		}

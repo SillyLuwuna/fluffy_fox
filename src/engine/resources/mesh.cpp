@@ -1,4 +1,5 @@
 #include "engine/resources/mesh.hpp"
+#include "rendering/gpu.hpp"
 
 #include <iostream>
 
@@ -38,7 +39,6 @@ bool Mesh::do_load()
 		Geometry geometry(*gltf_file_, mesh_primitive);
 		if (!geometry.is_valid()) return false;
 
-		geometry_.emplace_back(std::move(geometry));
 
 		const std::string idx = get_id() + "#texture/" + std::to_string(primitive_idx);
 		const std::string base_dir = "models";
@@ -50,12 +50,42 @@ bool Mesh::do_load()
 			primitive_idx
 		);
 
+		if (!texture) return false;
+
+
+		std::vector<Vertex> vertex_data = get_vertex_data(geometry, *texture);
+
+		std::cout << std::to_string(vertex_data[3].uv[1]) << "\n";
+		std::cout << std::to_string(vertex_data[0].pos[0]) << "\n";
+
+		GpuBuffer vertex_buffer = Gpu::upload(vertex_data, vk::BufferUsageFlagBits::eVertexBuffer);
+
+		geometry_.emplace_back(std::move(geometry));
 		textures_.emplace_back(std::move(texture));
+		vertex_buffers_.emplace_back(std::move(vertex_buffer));
 	}
 
 	return true;
 }
 
+std::vector<Vertex> Mesh::get_vertex_data(const Geometry& geometry, const Texture& texture)
+{
+	std::vector<Vertex> vertex_data;
+	u64 vertex_count = geometry.vertex_count();
+	vertex_data.reserve(vertex_count);
+
+	for (u64 i = 0; i < vertex_count; i++)
+	{
+		Vertex vertex {
+			.pos = geometry.vertices()[i],
+			.color = glm::vec3(1.0f, 1.0f, 1.0f),
+			.uv = texture.uvs()[i]
+		};
+		vertex_data.emplace_back(std::move(vertex));
+	}
+
+	return vertex_data;
+}
 
 void Mesh::do_unload()
 {

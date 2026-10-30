@@ -1,5 +1,6 @@
 #pragma once
 
+#include <glm/glm.hpp>
 #include "engine/resource_handle.hpp"
 #include "engine/resources/gltf_file.hpp"
 #include "rendering/gpu.hpp"
@@ -32,6 +33,7 @@ namespace fluffy_fox
 
 		u32 mip_levels_;
 
+		std::vector<glm::vec2> uvs_;
 		GpuImage gpu_image_;
 		vk::raii::Sampler sampler_;
 
@@ -39,6 +41,19 @@ namespace fluffy_fox
 		bool decode_image(const tg3_model& model, const tg3_image& image, Image& out_image);
 		u32 get_mip_levels(i32 width, i32 height) const;
 		vk::raii::Sampler create_sampler() const;
+
+		bool load_uvs(
+			GltfFile& gltf_file,
+			const tg3_primitive& primitive,
+			std::vector<glm::vec2>& out_uvs
+		);
+
+		bool add_uvs(
+			GltfFile& gltf_file,
+			const tg3_primitive& primitive,
+			const std::vector<f32>& uv_data,
+			std::vector<glm::vec2>& out_uvs
+		);
 
 	protected:
 		bool do_load() override;
@@ -50,5 +65,6 @@ namespace fluffy_fox
 
 		inline const GpuImage& image() const { return gpu_image_; }
 		inline vk::Sampler sampler() const { return sampler_; }
+		inline const std::vector<glm::vec2>& uvs() const { return uvs_; }
 	};
 }

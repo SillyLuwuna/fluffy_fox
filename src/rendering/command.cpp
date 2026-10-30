@@ -1,6 +1,5 @@
-#pragma once
-
 #include "rendering/command.hpp"
+#include <iostream>
 using namespace fluffy_fox::rendering;
 
 Command::Command(vk::raii::CommandPool& command_pool, bool one_time) :
@@ -36,16 +35,16 @@ vk::raii::CommandBuffer Command::create_command_buffer(
 
 Command::~Command()
 {
-	command_buffer_.end();
-
-	vk::SubmitInfo submit_info {
-		.commandBufferCount = 1,
-		.pCommandBuffers = &*command_buffer_
-	};
-
-	Device::instance().single_time_commands().submit(submit_info, nullptr);
-	// FIXME might not be the best idea to wait idle on every command...
-	Device::instance().single_time_commands().waitIdle();
+	// command_buffer_.end();
+	//
+	// vk::SubmitInfo submit_info {
+	// 	.commandBufferCount = 1,
+	// 	.pCommandBuffers = &*command_buffer_
+	// };
+	//
+	// Device::instance().single_time_commands().submit(submit_info, nullptr);
+	// // FIXME might not be the best idea to wait idle on every command...
+	// Device::instance().single_time_commands().waitIdle();
 }
 
 void Command::copy_buffer(
@@ -264,4 +263,19 @@ void Command::generate_mipmaps(GpuImage& image)
 		nullptr,
 		barrier
 	);
+
+}
+
+void Command::end()
+{
+	command_buffer_.end();
+
+	vk::SubmitInfo submit_info {
+		.commandBufferCount = 1,
+		.pCommandBuffers = &*command_buffer_
+	};
+
+	Device::instance().single_time_commands().submit(submit_info, nullptr);
+	// FIXME might not be the best idea to wait idle on every command...
+	Device::instance().single_time_commands().waitIdle();
 }
