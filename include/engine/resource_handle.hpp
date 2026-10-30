@@ -105,7 +105,7 @@ namespace fluffy_fox
 		resource_id_ = other.resource_id_;
 		resource_manager_ = other.resource_manager_;
 
-		if (!resource_manager_) return;
+		if (!resource_manager_) return *this;
 		resource_manager_->increment_ref_count<T>(resource_id_);
 
 		return *this;
@@ -114,7 +114,7 @@ namespace fluffy_fox
 	template<typename T>
 	ResourceHandle<T>& ResourceHandle<T>::operator=(std::nullptr_t)
 	{
-		if (!resource_manager_) return;
+		if (!resource_manager_) return *this;
 
 		resource_manager_->release<T>(resource_id_);
 

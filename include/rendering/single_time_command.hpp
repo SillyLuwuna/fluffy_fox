@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rendering/command.hpp"
 #include "rendering/device.hpp"
 
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
@@ -10,17 +11,17 @@ using namespace fluff::types;
 
 namespace fluffy_fox::rendering
 {
-	class SingleTimeCommand
+	class SingleTimeCommand : public Command
 	{
-	private:
-		vk::raii::CommandBuffer command_buffer_;
-
-		vk::raii::CommandBuffer create_command_buffer();
-
+	// PERF use a separate command pool for these short-lived buffers, for optimizations.
+	// vk::CommandPoolCreateFlagBits::eTransient would be needed in command pool generation, in that case.
+	// PERF we can use vk::raii::waitForFences instead if we want to schedule multiple transfers simultaneously
 	public:
-		SingleTimeCommand();
-		~SingleTimeCommand();
-
-		inline vk::raii::CommandBuffer& command_buffer() { return command_buffer_; }
+		SingleTimeCommand() :
+			Command(
+				Device::instance().single_time_commands_command_pool(),
+				true
+			)
+		{ }
 	};
 }

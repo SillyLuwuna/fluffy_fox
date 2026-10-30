@@ -1,5 +1,7 @@
 #include "engine/resources/geometry.hpp"
 
+#include "rendering/gpu.hpp"
+
 #include <iostream>
 
 using namespace fluffy_fox;
@@ -13,9 +15,9 @@ using namespace fluffy_fox;
 // { }
 
 Geometry::Geometry(GltfFile& gltf_file, const tg3_primitive& primitive) :
-	vertex_buffer_(nullptr),
+	vertex_buffer_(GpuBuffer::empty()),
 	vertex_count_(0),
-	index_buffer_(nullptr),
+	index_buffer_(GpuBuffer::empty()),
 	index_count_(0),
 	is_valid_(load(gltf_file, primitive))
 { }
@@ -44,18 +46,10 @@ bool Geometry::load(GltfFile& gltf_file, const tg3_primitive& primitive)
 	std::vector<u32> indices;
 	if (!load_primitive(gltf_file, primitive, vertices, indices)) return false;
 
-	vertex_buffer_ = Buffer(
-		vertices,
-		vk::BufferUsageFlagBits::eVertexBuffer,
-		vk::MemoryPropertyFlagBits::eDeviceLocal
-	);
+	vertex_buffer_ = Gpu::upload<glm::vec3>(vertices, vk::BufferUsageFlagBits::eVertexBuffer);
 	vertex_count_ = vertices.size();
 
-	index_buffer_ = Buffer(
-		indices,
-		vk::BufferUsageFlagBits::eIndexBuffer,
-		vk::MemoryPropertyFlagBits::eDeviceLocal
-	);
+	index_buffer_ = Gpu::upload<u32>(indices, vk::BufferUsageFlagBits::eIndexBuffer);
 	index_count_ = indices.size();
 
 	return true;

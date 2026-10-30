@@ -2,8 +2,6 @@
 
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan_raii.hpp>
-#define TINYGLTF3_ENABLE_FS
-#define TINYGLTF3_IMPLEMENTATION
 #include <tiny_gltf_v3.h>
 
 #include <fluff/types.hpp>
@@ -46,7 +44,7 @@ private:
 
 		for (u64 i = 0; i < accessor.count; i++)
 		{
-			for (int c = 0; c < num_components; c++)
+			for (u64 c = 0; c < num_components; c++)
 			{
 				out[i * num_components + c] = read_component<T>(
 					src + i * stride + c * component_size,
@@ -55,27 +53,29 @@ private:
 				);
 			}
 		}
+
+		return true;
 	}
 
 	const u8* get_data_view(
-		u64 buffer_view_idx,
+		i32 buffer_view_idx,
 		u64 offset,
 		u64 count,
 		u64 stride,
 		u64 element_size
 	)
 	{
-		if (buffer_view_idx < 0 || (uint32_t)buffer_view_idx >= model_->buffer_views_count) return nullptr;
+		if (buffer_view_idx < 0 || (u32)buffer_view_idx >= model_->buffer_views_count) return nullptr;
 
 		const tg3_buffer_view& buffer_view = model_->buffer_views[buffer_view_idx];
-		if (buffer_view.buffer < 0 || (uint32_t)buffer_view.buffer >= model_->buffers_count) return nullptr;
+		if (buffer_view.buffer < 0 || (u32)buffer_view.buffer >= model_->buffers_count) return nullptr;
 
 		const tg3_buffer& buffer = model_->buffers[buffer_view.buffer];
 		if (!buffer.data.data) return nullptr;
 		if (count == 0) return buffer.data.data;
 
-		uint64_t start = buffer_view.byte_offset + offset;
-		uint64_t end = start + (count - 1) * stride + element_size;
+		u64 start = buffer_view.byte_offset + offset;
+		u64 end = start + (count - 1) * stride + element_size;
 		if (end > buffer.data.count) return nullptr;
 
 		return buffer.data.data + start;

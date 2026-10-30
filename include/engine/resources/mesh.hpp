@@ -4,8 +4,6 @@
 #include "engine/resources/texture.hpp"
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan_raii.hpp>
-#define TINYGLTF3_ENABLE_FS
-#define TINYGLTF3_IMPLEMENTATION
 #include <tiny_gltf_v3.h>
 
 #include <fluff/types.hpp>
@@ -38,11 +36,11 @@ namespace fluffy_fox
 		std::vector<Geometry> geometry_;
 		std::vector<ResourceHandle<Texture>> textures_;
 	
+		void print_error(tinygltf3::ErrorStack& errors);
+
 	protected:
 		bool do_load() override;
 		void do_unload() override;
-
-		void print_error(tinygltf3::ErrorStack& errors);
 
 	public:
 		explicit Mesh(
@@ -53,6 +51,9 @@ namespace fluffy_fox
 		);
 
 		~Mesh() override;
+
+		inline const std::vector<Geometry>& geometry() const { return geometry_; }
+		inline const std::vector<ResourceHandle<Texture>>& textures() const { return textures_; }
 	};
 }
 

@@ -1,4 +1,5 @@
 #include "engine/resources/texture.hpp"
+#include <cmath>
 
 using namespace fluffy_fox;
 
@@ -8,14 +9,7 @@ Texture::Texture(const std::string& id, const std::string& base_dir, ResourceHan
 	gltf_file_(std::move(gltf_file)),
 	mesh_idx_(mesh_idx),
 	primitive_idx_(primitive_idx),
-	width_(0),
-	height_(0),
-	channels_(0),
-	bytes_(0),
-	mip_levels_(0),
-	image_(nullptr),
-	memory_(nullptr),
-	image_view_(nullptr),
+	gpu_image_(GpuImage::empty()),
 	sampler_(nullptr)
 { }
 
@@ -37,10 +31,23 @@ bool Texture::do_load()
 	const tg3_image* image = get_texture_image(model, primitive);
 	if (image == nullptr) return false;
 
-	if (!decode_image(model, *image)) return false;
+	if (!decode_image(model, *image, image_)) return false;
 
-	mip_levels_ = get_mip_levels(width_, height_);
-	// FIXME image_, memory_, image_view_ and sampler_ from VulkanTutorial::createTextureImage()
+	mip_levels_ = get_mip_levels(image_.width, image_.height);
+
+	gpu_image_ = Gpu::create_image(
+		image_.width,
+		image_.height,
+		mip_levels_,
+		vk::SampleCountFlagBits::e1,
+		vk::Format::eR8G8B8A8Srgb,
+		vk::ImageTiling::eOptimal,
+		vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+		vk::ImageAspectFlagBits::eColor,
+		vk::MemoryPropertyFlagBits::eDeviceLocal
+	);
+
+	sampler_ = create_sampler();
 
 	return true;
 }
@@ -50,14 +57,37 @@ u32 Texture::get_mip_levels(i32 width, i32 height) const
 	return static_cast<u32>(std::floor(std::log2(std::max(width, height)))) + 1;
 }
 
+vk::raii::Sampler Texture::create_sampler() const
+{
+	vk::PhysicalDeviceProperties properties = Device::instance().physical().getProperties();
+
+	vk::SamplerCreateInfo sampler_info {
+		.magFilter = vk::Filter::eLinear, // when close to camera, magnify
+		.minFilter = vk::Filter::eLinear, // when far away from camera, minify
+		.mipmapMode = vk::SamplerMipmapMode::eLinear, // eNearest to select nearest mipmap, eLinear to interpolate between the two with the Filters
+		.addressModeU = vk::SamplerAddressMode::eRepeat,
+		.addressModeV = vk::SamplerAddressMode::eRepeat,
+		.addressModeW = vk::SamplerAddressMode::eRepeat,
+		.mipLodBias = 0.0f, // bias for mipmap selection
+		.anisotropyEnable = true,
+		.maxAnisotropy = properties.limits.maxSamplerAnisotropy, // PERF slow, could select a lower value
+		.compareEnable = false,
+		.compareOp = vk::CompareOp::eAlways,
+		.minLod = 0.0f,
+		.maxLod = vk::LodClampNone, // 0.0f to disable
+		.borderColor = vk::BorderColor::eIntOpaqueBlack,
+		.unnormalizedCoordinates = false,
+	};
+
+	return vk::raii::Sampler(Device::instance().logical(), sampler_info);
+}
+
 void Texture::do_unload()
 {
 	if (!is_loaded()) return;
 
 	gltf_file_ = nullptr;
 	image_ = nullptr;
-	memory_ = nullptr;
-	image_view_ = nullptr;
 	sampler_ = nullptr;
 }
 
@@ -76,7 +106,7 @@ const tg3_image* Texture::get_texture_image(const tg3_model& model, const tg3_pr
 	return &model.images[image_index];
 }
 
-bool Texture::decode_image(const tg3_model& model, const tg3_image& image)
+bool Texture::decode_image(const tg3_model& model, const tg3_image& image, Image& out_image)
 {
 	const uint8_t* encoding = nullptr;
 	u64 encoding_size = 0;
@@ -112,12 +142,18 @@ bool Texture::decode_image(const tg3_model& model, const tg3_image& image)
 	if (!encoding) return false;
 
 	// FIXME is num_components really the same as num_channels
-	u8* pixels = stbi_load_from_memory(encoding, (i32)encoding_size, &width_, &height_, &channels_, STBI_rgb_alpha);
+	u8* pixels = stbi_load_from_memory(
+		encoding,
+		(i32)encoding_size,
+		&out_image.width,
+		&out_image.height,
+		&out_image.channels,
+		STBI_rgb_alpha
+	);
 
-	// result.bytes = result.width * result.height * result.channels; // channels should be 4 // TODO put this in struct method
-	bytes_ = width_ * height_ * 4; // channels should be 4
-	pixels_ = std::make_unique<u8[]>(bytes_);
-	memcpy(pixels_.get(), pixels, bytes_);
+	out_image.bytes = out_image.width * out_image.height * 4; // channels should be 4
+	out_image.pixels = std::make_unique<u8[]>(out_image.bytes);
+	memcpy(out_image.pixels.get(), pixels, out_image.bytes);
 
 	stbi_image_free(pixels);
 

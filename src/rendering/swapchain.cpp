@@ -1,6 +1,7 @@
 #include "rendering/swapchain.hpp"
 
 #include "rendering/vulkan_image.hpp"
+#include "rendering/gpu.hpp"
 
 using namespace fluffy_fox::rendering;
 
@@ -144,9 +145,9 @@ void Swapchain::recreate(const Window& window)
 	depth_ = create_depth_image();
 }
 
-Image Swapchain::create_color_image() const
+GpuImage Swapchain::create_color_image() const
 {
-	return Image(
+	return Gpu::create_image(
 		extent_.width,
 		extent_.height,
 		1,
@@ -154,14 +155,14 @@ Image Swapchain::create_color_image() const
 		surface_format_.format,
 		vk::ImageTiling::eOptimal,
 		vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eColorAttachment,
-		vk::MemoryPropertyFlagBits::eDeviceLocal,
-		vk::ImageAspectFlagBits::eColor
+		vk::ImageAspectFlagBits::eColor,
+		vk::MemoryPropertyFlagBits::eDeviceLocal
 	);
 }
 
-Image Swapchain::create_depth_image() const
+GpuImage Swapchain::create_depth_image() const
 {
-	return Image(
+	return Gpu::create_image(
 		extent_.width,
 		extent_.height,
 		1,
@@ -169,12 +170,13 @@ Image Swapchain::create_depth_image() const
 		Device::instance().depth_format(),
 		vk::ImageTiling::eOptimal,
 		vk::ImageUsageFlagBits::eDepthStencilAttachment,
-		vk::MemoryPropertyFlagBits::eDeviceLocal,
-		vk::ImageAspectFlagBits::eDepth
+		vk::ImageAspectFlagBits::eDepth,
+		vk::MemoryPropertyFlagBits::eDeviceLocal
 	);
 }
 
 bool Swapchain::is_valid() const
 {
-	return color_.is_valid() && depth_.is_valid();
+	// return color_.is_valid() && depth_.is_valid();
+	return true; // FIXME
 }

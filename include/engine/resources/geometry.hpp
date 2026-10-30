@@ -4,8 +4,6 @@
 #include "engine/resources/gltf_file.hpp"
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan_raii.hpp>
-#define TINYGLTF3_ENABLE_FS
-#define TINYGLTF3_IMPLEMENTATION
 #include <tiny_gltf_v3.h>
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
@@ -18,7 +16,7 @@
 using namespace fluff::types;
 
 #include "engine/resource.hpp"
-#include "rendering/buffer.hpp"
+#include "rendering/gpu_buffer.hpp"
 
 using namespace fluffy_fox::rendering;
 
@@ -27,10 +25,10 @@ namespace fluffy_fox
 	class Geometry
 	{
 	private:
-		Buffer vertex_buffer_;
+		GpuBuffer vertex_buffer_;
 		u32 vertex_count_;
 
-		Buffer index_buffer_;
+		GpuBuffer index_buffer_;
 		u32 index_count_;
 
 		bool is_valid_;
@@ -65,8 +63,8 @@ namespace fluffy_fox
 		~Geometry();
 
 		inline bool is_valid() const { return is_valid_; }
-		inline const vk::Buffer vertex_buffer() const { return vertex_buffer_.buffer(); }
-		inline const vk::Buffer index_buffer() const { return index_buffer_.buffer(); }
+		inline const vk::Buffer vertex_buffer() const { return vertex_buffer_.buffer; }
+		inline const vk::Buffer index_buffer() const { return index_buffer_.buffer; }
 		inline u32 vertex_count() const { return vertex_count_; }
 		inline u32 index_count() const { return index_count_; }
 	};
