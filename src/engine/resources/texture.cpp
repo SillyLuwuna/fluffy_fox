@@ -190,3 +190,12 @@ bool Texture::decode_image(const tg3_model& model, const tg3_image& image, Image
 
 	return true;
 }
+
+vk::DescriptorImageInfo Texture::descriptor_info() const
+{
+	return {
+		.sampler = sampler_,
+		.imageView = gpu_image_.view,
+		.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+	};
+}

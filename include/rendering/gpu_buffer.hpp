@@ -21,6 +21,11 @@ namespace fluffy_fox::rendering
 			};
 		}
 
+		inline operator bool() const
+		{
+			return buffer != nullptr;
+		}
+
 		// inline Buffer& operator=(const Buffer& other) = delete;
 		// inline Buffer(const Buffer& other) = delete;
 		//

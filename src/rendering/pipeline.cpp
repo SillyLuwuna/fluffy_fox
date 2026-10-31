@@ -9,6 +9,7 @@ Pipeline::Pipeline(
 	ResourceManager& resource_manager,
 	Swapchain& swapchain
 ) :
+	descriptor_set_layout_bindings_(get_descriptor_set_layout_bindings()),
 	descriptor_set_layout_(create_descriptor_set_layout()),
 	pipeline_layout_(create_pipeline_layout()),
 	pipeline_(create_graphics_pipeline(resource_manager, swapchain))
@@ -16,11 +17,9 @@ Pipeline::Pipeline(
 
 vk::raii::DescriptorSetLayout Pipeline::create_descriptor_set_layout() const
 {
-	std::vector<vk::DescriptorSetLayoutBinding> bindings = get_descriptor_set_layout_bindings();
-
 	vk::DescriptorSetLayoutCreateInfo layout_info {
-		.bindingCount = static_cast<u32>(bindings.size()),
-		.pBindings = bindings.data()
+		.bindingCount = static_cast<u32>(descriptor_set_layout_bindings_.size()),
+		.pBindings = descriptor_set_layout_bindings_.data()
 	};
 
 	return vk::raii::DescriptorSetLayout(Device::instance().logical(), layout_info);
@@ -30,6 +29,7 @@ std::vector<vk::DescriptorSetLayoutBinding> Pipeline::get_descriptor_set_layout_
 {
 	return {
 		{
+			// TODO make it so that these bindings are all tracked automatically here and in descriptor sets
 			.binding = 0,
 			.descriptorType = vk::DescriptorType::eUniformBuffer,
 			.descriptorCount = 1,

@@ -16,6 +16,7 @@ namespace fluffy_fox::rendering
 	class Pipeline
 	{
 	private:
+		std::vector<vk::DescriptorSetLayoutBinding> descriptor_set_layout_bindings_;
 		vk::raii::DescriptorSetLayout descriptor_set_layout_;
 		vk::raii::PipelineLayout pipeline_layout_;
 		vk::raii::Pipeline pipeline_;
@@ -73,6 +74,10 @@ namespace fluffy_fox::rendering
 		bool is_valid() const;
 
 		inline const vk::raii::DescriptorSetLayout& descriptor_set_layout() const { return descriptor_set_layout_; }
+		inline const std::vector<vk::DescriptorSetLayoutBinding>& descriptor_set_layout_bindings() const
+		{
+			return descriptor_set_layout_bindings_;
+		}
 		inline const vk::raii::PipelineLayout& layout() const { return pipeline_layout_; }
 		inline const vk::raii::Pipeline& pipeline() const { return pipeline_; }
 	};

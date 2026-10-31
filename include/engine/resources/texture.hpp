@@ -61,8 +61,14 @@ namespace fluffy_fox
 		explicit Texture(const std::string& id, const std::string& base_dir, ResourceHandle<GltfFile> gltf_file, u32 mesh_idx, u32 primitive_idx);
 		~Texture() override;
 
-		inline const GpuImage& image() const { return gpu_image_; }
-		inline vk::Sampler sampler() const { return sampler_; }
+		// inline const GpuImage& image() const { return gpu_image_; }
+		// inline vk::Sampler sampler() const { return sampler_; }
 		inline const std::vector<glm::vec2>& uvs() const { return uvs_; }
+
+		vk::DescriptorImageInfo descriptor_info() const;
+		constexpr vk::DescriptorType descriptor_type() const
+		{
+			return vk::DescriptorType::eCombinedImageSampler;
+		}
 	};
 }

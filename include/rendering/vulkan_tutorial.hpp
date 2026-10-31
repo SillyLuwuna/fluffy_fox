@@ -17,7 +17,9 @@
 #include "rendering/window.hpp"
 #include "rendering/device.hpp"
 #include "rendering/pipeline.hpp"
-#include "rendering/vertex.hpp"
+#include "rendering/uniform_buffer.hpp"
+#include "rendering/descriptor_writer.hpp"
+#include "rendering/descriptor_allocator.hpp"
 
 // TODO push constants
 // TODO instancing
@@ -66,9 +68,7 @@ namespace fluffy_fox::rendering
 		glm::vec3 scale = { 1.0f, 1.0f, 1.0f };
 
 		// uniform buffer for this object (one per frame in flight)
-		std::vector<vk::raii::Buffer> uniformBuffers;
-		std::vector<vk::raii::DeviceMemory> uniformBuffersMemory;
-		std::vector<void*> uniformBuffersMapped;
+		std::vector<UniformBuffer<UniformBufferObject>> uniformBuffers;
 
 		// descriptor sets for this object (one per frame in flight)
 		std::vector<vk::raii::DescriptorSet> descriptorSets;
@@ -102,8 +102,7 @@ namespace fluffy_fox::rendering
 		std::unique_ptr<Swapchain> swapchain;
 		std::unique_ptr<Pipeline> pipeline;
 		ResourceHandle<Mesh> mesh;
-
-		vk::raii::DescriptorPool descriptorPool = nullptr;
+		std::unique_ptr<DescriptorAllocator> descriptor_allocator;
 
 		std::vector<vk::raii::CommandBuffer> commandBuffers;
 		std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
@@ -113,7 +112,7 @@ namespace fluffy_fox::rendering
 
 		bool framebufferResized = false;
 
-		std::array<GameObject, MAX_OBJECTS> gameObjects;
+		std::vector<GameObject> gameObjects;
 
 		static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(
 			vk::DebugUtilsMessageSeverityFlagBitsEXT, // severity
@@ -230,6 +229,10 @@ namespace fluffy_fox::rendering
 
 		void setupGameObjects()
 		{
+			gameObjects.emplace_back(GameObject());
+			gameObjects.emplace_back(GameObject());
+			gameObjects.emplace_back(GameObject());
+
 			gameObjects[0].position = {0.0f, 0.0f, 0.0f};
 			gameObjects[0].rotation = {0.0f, 0.0f, 0.0f};
 			gameObjects[0].scale = {1.0f, 1.0f, 1.0f};
@@ -238,9 +241,27 @@ namespace fluffy_fox::rendering
 			gameObjects[1].rotation = {0.0f, glm::radians(45.0f), 0.0f};
 			gameObjects[1].scale = {0.75f, 0.75f, 0.75f};
 
-			gameObjects[2].position = {2.0f, 0.0f, -1.0f};
+			gameObjects[2].position = {0.5f, -1.8f, 0.5f};
 			gameObjects[2].rotation = {0.0f, glm::radians(-45.0f), 0.0f};
 			gameObjects[2].scale = {0.75f, 0.75f, 0.75f};
+
+			for (auto& gameObject : gameObjects)
+			{
+				gameObject.descriptorSets = descriptor_allocator->allocate(
+					*pipeline->descriptor_set_layout(),
+					MAX_FRAMES_IN_FLIGHT
+				);
+
+				for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+				{
+					gameObject.uniformBuffers.emplace_back(UniformBuffer<UniformBufferObject>());
+
+					DescriptorWriter()
+						.write(0, gameObject.uniformBuffers[i])
+						.write(1, *mesh->textures()[0]) // FIXME only for primitive 0
+						.update(gameObject.descriptorSets[i]);
+				}
+			}
 		}
 
 		void createCommandBuffers()
@@ -276,107 +297,6 @@ namespace fluffy_fox::rendering
 				std::move(buffer),
 				std::move(bufferMemory)
 			};
-		}
-
-		void createUniformBuffers()
-		{
-			for (auto& gameObject : gameObjects)
-			{
-				gameObject.uniformBuffers.clear();
-				gameObject.uniformBuffersMemory.clear();
-				gameObject.uniformBuffersMapped.clear();
-
-				for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-				{
-					vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
-					auto [buffer, bufferMem] = createBuffer(
-						bufferSize,
-						vk::BufferUsageFlagBits::eUniformBuffer,
-						vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
-					);
-					gameObject.uniformBuffers.emplace_back(std::move(buffer));
-					gameObject.uniformBuffersMemory.emplace_back(std::move(bufferMem));
-					gameObject.uniformBuffersMapped.emplace_back(gameObject.uniformBuffersMemory.back().mapMemory(0, bufferSize));
-				}
-			}
-		}
-
-		void createDescriptorPool()
-		{
-			std::array<vk::DescriptorPoolSize, 2> poolSize {{
-				{
-					.type = vk::DescriptorType::eUniformBuffer,
-					.descriptorCount = MAX_OBJECTS * MAX_FRAMES_IN_FLIGHT
-				},
-				{
-					.type = vk::DescriptorType::eCombinedImageSampler,
-					.descriptorCount = MAX_OBJECTS * MAX_FRAMES_IN_FLIGHT
-				}
-			}};
-
-			vk::DescriptorPoolCreateInfo poolInfo {
-				.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-				.maxSets = MAX_OBJECTS * MAX_FRAMES_IN_FLIGHT,
-				.poolSizeCount = static_cast<uint32_t>(poolSize.size()),
-				.pPoolSizes = poolSize.data()
-			};
-
-			descriptorPool = vk::raii::DescriptorPool(Device::instance().logical(), poolInfo);
-		}
-
-		void createDescriptorSets()
-		{
-			for (auto& gameObject : gameObjects)
-			{
-				std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, *pipeline->descriptor_set_layout());
-
-				vk::DescriptorSetAllocateInfo allocInfo {
-					.descriptorPool = descriptorPool,
-					.descriptorSetCount = static_cast<uint32_t>(layouts.size()),
-					.pSetLayouts = layouts.data()
-				};
-
-				gameObject.descriptorSets.clear();
-				gameObject.descriptorSets = Device::instance().logical().allocateDescriptorSets(allocInfo);
-
-				for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-				{
-					vk::DescriptorBufferInfo bufferInfo {
-						.buffer = gameObject.uniformBuffers[i],
-						.offset = 0,
-						.range = sizeof(UniformBufferObject)
-					};
-
-					vk::DescriptorImageInfo imageInfo {
-						.sampler = mesh->textures()[0]->sampler(), // FIXME only for primitive 0
-						.imageView = mesh->textures()[0]->image().view, // FIXME only for primitive 0
-						// .sampler = textureSampler,
-						// .imageView = textureImageView,
-						.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-					};
-
-					std::array<vk::WriteDescriptorSet, 2> descriptorWrites {{
-						{
-							.dstSet = gameObject.descriptorSets[i],
-							.dstBinding = 0,
-							.dstArrayElement = 0,
-							.descriptorCount = 1,
-							.descriptorType = vk::DescriptorType::eUniformBuffer,
-							.pBufferInfo = &bufferInfo
-						},
-						{
-							.dstSet = gameObject.descriptorSets[i],
-							.dstBinding = 1,
-							.dstArrayElement = 0,
-							.descriptorCount = 1,
-							.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-							.pImageInfo = &imageInfo
-						}
-					}};
-
-					Device::instance().logical().updateDescriptorSets(descriptorWrites, {});
-				}
-			}
 		}
 
 		uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
@@ -473,7 +393,7 @@ namespace fluffy_fox::rendering
 			commandBuffer.beginRendering(renderingInfo);
 			commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline->pipeline());
 
-			commandBuffer.bindVertexBuffers(0, *mesh->vertex_buffers()[0].buffer, {0}); // FIXME only for primitive 0
+			commandBuffer.bindVertexBuffers(0, *mesh->vertex_buffers()[0].buffer, {0}); // FIXME only for primitive 0, literally accepts an array
 			commandBuffer.bindIndexBuffer(mesh->geometry()[0].index_buffer(), 0, vk::IndexTypeValue<u32>::value); // FIXME only for primitive 0
 
 			vk::Viewport viewport {
@@ -682,7 +602,7 @@ namespace fluffy_fox::rendering
 					.proj = proj
 				};
 
-				memcpy(gameObject.uniformBuffersMapped[frameIndex], &ubo, sizeof(ubo));
+				gameObject.uniformBuffers[frameIndex].set(ubo);
 			}
 		}
 
@@ -742,10 +662,13 @@ namespace fluffy_fox::rendering
 			mesh = resource_manager->load<Mesh>(MODEL_PATH, *resource_manager, std::move(gltf_file), 0); // FIXME only mesh 0
 			if (!mesh) { throw std::runtime_error("failed to load mesh!"); } // FIXME if this errors where it was erroring, the program freaks out
 
+			descriptor_allocator = std::make_unique<DescriptorAllocator>(
+				MAX_OBJECTS * MAX_FRAMES_IN_FLIGHT,
+				*pipeline
+			);
+
 			setupGameObjects();
-			createUniformBuffers();
-			createDescriptorPool();
-			createDescriptorSets();
+
 			createCommandBuffers();
 			createSyncObjects();
 
@@ -754,26 +677,12 @@ namespace fluffy_fox::rendering
 
 		~VulkanTutorial()
 		{
-			for (auto& gameObject : gameObjects)
-			{
-				for (size_t i = 0; i < gameObject.uniformBuffersMemory.size(); i++)
-				{
-					if (gameObject.uniformBuffersMapped[i] != nullptr)
-					{
-						gameObject.uniformBuffersMemory[i].unmapMemory();
-					}
-				}
-
-				gameObject.uniformBuffers.clear();
-				gameObject.uniformBuffersMemory.clear();
-				gameObject.uniformBuffersMapped.clear();
-				gameObject.descriptorSets.clear();
-			}
+			gameObjects.clear();
 
 			surface = window.take_surface(); // FIXME
 
 			// FIXME
-			descriptorPool = nullptr;
+			descriptor_allocator = nullptr;
 			commandBuffers.clear();
 			presentCompleteSemaphores.clear();
 			renderFinishedSemaphores.clear();

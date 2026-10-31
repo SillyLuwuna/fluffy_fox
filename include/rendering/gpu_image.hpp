@@ -32,6 +32,11 @@ namespace fluffy_fox::rendering
 			};
 		}
 
+		inline operator bool() const
+		{
+			return image != nullptr;
+		}
+
 		inline GpuImage& operator=(std::nullptr_t)
 		{
 			image = nullptr;
