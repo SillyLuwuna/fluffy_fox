@@ -38,7 +38,6 @@ namespace fluffy_fox
 		std::vector<ResourceHandle<Texture>> textures_;
 		std::vector<GpuBuffer> vertex_buffers_;
 	
-		void print_error(tinygltf3::ErrorStack& errors);
 		std::vector<Vertex> get_vertex_data(const Geometry& geometry, const Texture& texture);
 
 	protected:

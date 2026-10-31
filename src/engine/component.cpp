@@ -40,7 +40,8 @@ bool Component::is_active() const
 
 void Component::on_initialize() { }
 void Component::on_destroy() { }
-void Component::update(float delta_time) { }
+// void Component::update(float delta_time) { }
+void Component::update(float ) { }
 void Component::render() { }
 
 void Component::set_owner(Entity* entity)

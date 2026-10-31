@@ -13,6 +13,7 @@ namespace fluffy_fox::rendering
 	class Device
 	{
 	private:
+		static inline std::unique_ptr<Device> instance_ptr;
 		Device();
 
 		struct FeatureChain
@@ -91,11 +92,17 @@ namespace fluffy_fox::rendering
 		Device& operator=(Device&&) = delete;
 
 		static void create(vk::raii::Instance& instance, vk::SurfaceKHR surface);
+		friend struct std::default_delete<Device>; // allow unique_ptr to delete
 		inline static Device& instance()
 		{
-			static Device instance;
+			// static Device instance;
+			if (!instance_ptr) instance_ptr.reset(new Device);
+			return *instance_ptr;
+		}
 
-			return instance;
+		inline static void release()
+		{
+			instance_ptr.reset();
 		}
 
 		inline vk::raii::PhysicalDevice& physical() { return physical_device_; } // TODO remove
@@ -114,8 +121,9 @@ namespace fluffy_fox::rendering
 		inline u32 compute_family() const { return compute_.family; }
 
 		inline vk::SampleCountFlagBits msaa_sample_count() const { return msaa_sample_count_; }
-		inline vk::raii::CommandPool& graphics_command_pool() { return graphics_command_pool_; }
 		inline vk::Format depth_format() const { return depth_format_; }
+
+		inline vk::raii::CommandPool& graphics_command_pool() { return graphics_command_pool_; }
 		vk::raii::CommandPool& single_time_commands_command_pool();
 		// TODO others
 

@@ -172,6 +172,10 @@ namespace fluffy_fox::rendering
 				vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
 			);
 
+			void* data_staging = staging.memory.mapMemory(0, image.bytes);
+			memcpy(data_staging, image.pixels.get(), image.bytes);
+			staging.memory.unmapMemory();
+
 			GpuImage gpu_image = create_image(
 				image.width,
 				image.height,

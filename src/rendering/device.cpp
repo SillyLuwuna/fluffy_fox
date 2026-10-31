@@ -176,7 +176,7 @@ vk::raii::Device Device::create_logical_device(vk::raii::PhysicalDevice& physica
 	// init_queue(present_, device);
 	// init_queue(transfer_, device);
 
-	return std::move(device);
+	return device;
 }
 
 // assumes queue_info is populated
@@ -192,7 +192,7 @@ i32 Device::find_graphics_queue_index(vk::raii::PhysicalDevice& physical_device,
 
 	i32 queue = -1;
 
-	for (i32 i = 0; i < queue_family_properties.size(); i++)
+	for (i32 i = 0; i < static_cast<i32>(queue_family_properties.size()); i++)
 	{
 		vk::QueueFamilyProperties& queue_properties = queue_family_properties[i];
 		bool is_graphics_queue = static_cast<bool>(queue_properties.queueFlags & vk::QueueFlagBits::eGraphics);
@@ -217,7 +217,7 @@ i32 Device::find_transfer_queue_index(vk::raii::PhysicalDevice& physical_device)
 {
 	std::vector<vk::QueueFamilyProperties> queue_family_properties = physical_device.getQueueFamilyProperties();
 
-	for (i32 i = 0; i < queue_family_properties.size(); i++)
+	for (i32 i = 0; i < static_cast<i32>(queue_family_properties.size()); i++)
 	{
 		vk::QueueFamilyProperties& queue_properties = queue_family_properties[i];
 		if (queue_properties.queueFlags & vk::QueueFlagBits::eTransfer)
@@ -235,7 +235,7 @@ i32 Device::find_present_queue_index(vk::raii::PhysicalDevice& physical_device, 
 
 	i32 queue = -1;
 
-	for (i32 i = 0; i < queue_family_properties.size(); i++)
+	for (i32 i = 0; i < static_cast<i32>(queue_family_properties.size()); i++)
 	{
 		vk::QueueFamilyProperties& queue_properties = queue_family_properties[i];
 		bool is_graphics_queue = static_cast<bool>(queue_properties.queueFlags & vk::QueueFlagBits::eGraphics);
@@ -259,7 +259,7 @@ i32 Device::find_compute_queue_index(vk::raii::PhysicalDevice& physical_device)
 {
 	std::vector<vk::QueueFamilyProperties> queue_family_properties = physical_device.getQueueFamilyProperties();
 
-	for (i32 i = 0; i < queue_family_properties.size(); i++)
+	for (i32 i = 0; i < static_cast<i32>(queue_family_properties.size()); i++)
 	{
 		vk::QueueFamilyProperties& queue_properties = queue_family_properties[i];
 		if (queue_properties.queueFlags & vk::QueueFlagBits::eCompute)
@@ -358,7 +358,7 @@ void Device::create_present_queues(std::vector<vk::DeviceQueueCreateInfo>& out, 
 		.pQueuePriorities = &present_.priority
 	};
 
-	// out.emplace_back(queue_create_info);
+	out.emplace_back(queue_create_info);
 }
 
 void Device::create_transfer_queues(std::vector<vk::DeviceQueueCreateInfo>& out)
@@ -379,7 +379,7 @@ void Device::create_transfer_queues(std::vector<vk::DeviceQueueCreateInfo>& out)
 		.pQueuePriorities = &transfer_.priority
 	};
 
-	// out.emplace_back(queue_create_info);
+	out.emplace_back(queue_create_info);
 }
 
 void Device::create_compute_queues(std::vector<vk::DeviceQueueCreateInfo>& out)
@@ -400,7 +400,7 @@ void Device::create_compute_queues(std::vector<vk::DeviceQueueCreateInfo>& out)
 		.pQueuePriorities = &compute_.priority
 	};
 
-	// out.emplace_back(queue_create_info);
+	out.emplace_back(queue_create_info);
 }
 
 vk::raii::CommandPool Device::create_command_pool(u32 family) const

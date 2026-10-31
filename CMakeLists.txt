@@ -104,6 +104,13 @@ file(GLOB_RECURSE SHADER_SLANG_SOURCES CONFIGURE_DEPENDS ${SHADER_DIR}/*.slang)
 add_slang_shader_target(SHADERS SOURCES ${SHADER_SLANG_SOURCES})
 add_dependencies(${LIB} SHADERS)
 
+target_compile_options(${LIB} PRIVATE
+	-Wall
+	-Wextra
+	-Wpedantic
+	-O3
+)
+
 # file(
 # 	COPY ${THIRD_PARTY_DIR}/bgfx/bgfx/src/bgfx_shader.sh
 # 	DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER_DIR}
@@ -126,7 +133,7 @@ target_compile_options(${BIN} PRIVATE
 	-Wall
 	-Wextra
 	-Wpedantic
-	-O2
+	-O3
 )
 
 # tests

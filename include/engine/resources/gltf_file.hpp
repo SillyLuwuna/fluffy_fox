@@ -180,7 +180,7 @@ public:
 		i32 component_size = tg3_component_size(accessor.component_type);
 		if (out_num_components <= 0 || component_size <= 0) return false;
 
-		out.assign((u64)accessor.count * component_size, 0.0f);
+		out.assign((u64)accessor.count * out_num_components, (T)0);
 		const bool is_accessor_normalized = accessor.normalized != 0;
 
 		if (accessor.buffer_view < 0) return false;

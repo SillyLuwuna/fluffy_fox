@@ -55,9 +55,6 @@ bool Mesh::do_load()
 
 		std::vector<Vertex> vertex_data = get_vertex_data(geometry, *texture);
 
-		std::cout << std::to_string(vertex_data[3].uv[1]) << "\n";
-		std::cout << std::to_string(vertex_data[0].pos[0]) << "\n";
-
 		GpuBuffer vertex_buffer = Gpu::upload(vertex_data, vk::BufferUsageFlagBits::eVertexBuffer);
 
 		geometry_.emplace_back(std::move(geometry));
@@ -92,15 +89,4 @@ void Mesh::do_unload()
 	if (!is_loaded()) return;
 
 	geometry_.clear();
-}
-
-void Mesh::print_error(tinygltf3::ErrorStack& errors)
-{
-	std::string error;
-	for (uint32_t i = 0; i < errors.count(); i++)
-	{
-		error += "[" + std::to_string((int)errors.entry(i)->severity) + "] ";
-		error += errors.entry(i)->message ? errors.entry(i)->message : "(null)";
-	}
-	std::cout << error << "\n";
 }

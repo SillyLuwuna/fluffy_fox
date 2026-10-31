@@ -49,8 +49,6 @@ namespace fluffy_fox
 		);
 
 		bool add_uvs(
-			GltfFile& gltf_file,
-			const tg3_primitive& primitive,
 			const std::vector<f32>& uv_data,
 			std::vector<glm::vec2>& out_uvs
 		);

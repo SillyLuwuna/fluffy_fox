@@ -51,10 +51,9 @@ namespace fluffy_fox
 			std::vector<u32>& indices
 		);
 
-		static bool load_vertices(
+		static bool load_indices(
 			GltfFile& gltf_file,
 			const tg3_primitive& primitive,
-			const std::vector<glm::vec3>& vertices,
 			std::vector<u32>& indices
 		);
 

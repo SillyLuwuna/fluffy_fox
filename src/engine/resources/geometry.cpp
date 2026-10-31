@@ -129,30 +129,19 @@ bool Geometry::add_vertices(
 
 	if (has_indices)
 	{
-		if (!load_vertices(gltf_file, primitive, vertices, indices)) return false;
+		if (!load_indices(gltf_file, primitive, indices)) return false;
 	}
 
 	return true;
 }
 
-bool Geometry::load_vertices(
+bool Geometry::load_indices(
 	GltfFile& gltf_file,
 	const tg3_primitive& primitive,
-	const std::vector<glm::vec3>& vertices,
 	std::vector<u32>& indices
 )
 {
-	// const u32 base = (u32)vertices.size();
-
 	i32 idx_num_components;
-	std::vector<u32> idx;
-	if (!gltf_file.read_accessor<u32>(primitive.indices, idx, idx_num_components)) return false;
-
-	for (u32 i : idx)
-	{
-		// indices.push_back(base + i);
-		indices.push_back(i);
-	}
-
+	if (!gltf_file.read_accessor<u32>(primitive.indices, indices, idx_num_components)) return false;
 	return true;
 }

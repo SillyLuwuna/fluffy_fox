@@ -773,11 +773,16 @@ namespace fluffy_fox::rendering
 			surface = window.take_surface(); // FIXME
 
 			// FIXME
+			descriptorPool = nullptr;
+			commandBuffers.clear();
+			presentCompleteSemaphores.clear();
+			renderFinishedSemaphores.clear();
+			inFlightFences.clear();
 			mesh = nullptr;
 			pipeline = nullptr;
 			swapchain = nullptr;
 			resource_manager = nullptr;
-			std::cout << "here\n";
+			Device::release(); // FIXME not very clean
 
 			// window.destroy_surface();
 		}

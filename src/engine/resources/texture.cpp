@@ -57,14 +57,12 @@ bool Texture::load_uvs(
 		num_components != 2
 	) return false;
 
-	if (!add_uvs(gltf_file, primitive, uv_data, out_uvs)) return false;
+	if (!add_uvs(uv_data, out_uvs)) return false;
 
 	return true;
 }
 
 bool Texture::add_uvs(
-	GltfFile& gltf_file,
-	const tg3_primitive& primitive,
 	const std::vector<f32>& uv_data,
 	std::vector<glm::vec2>& out_uvs
 )
@@ -181,6 +179,8 @@ bool Texture::decode_image(const tg3_model& model, const tg3_image& image, Image
 		&out_image.channels,
 		STBI_rgb_alpha
 	);
+
+	if (!pixels) return false;
 
 	out_image.bytes = out_image.width * out_image.height * 4; // channels should be 4
 	out_image.pixels = std::make_unique<u8[]>(out_image.bytes);
